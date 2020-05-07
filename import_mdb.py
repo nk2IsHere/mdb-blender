@@ -2,8 +2,8 @@
 # heavily based on https://github.com/JLouis-B/RedTools/blob/master/W2ENT_QT/IO_MeshLoader_WitcherMDL.cpp
 import os
 
-from mdb.model_data import ModelData
-from mdb.file_utils import FileWrapper
+from .model_data import ModelData
+from .file_utils import FileWrapper, ArrayDefinition, readArray
 from bpy.types import Armature
 from mathutils import Matrix
 
@@ -14,7 +14,18 @@ def loadNode(
     parentJoint: Armature = None,
     parentTransform: Matrix = None
 ):
-    pass
+    wrapper.seek(24 + 4, relative=True)  # Function pointers, inherit color flag
+    id = wrapper.readUInt32()
+    name = wrapper.readString(64)
+
+    wrapper.seek(8, relative=True)  # parent geometry, parent node
+    childrenNodesDef = ArrayDefinition.fromWrapper(wrapper)
+    children = readArray(wrapper, modelData, childrenNodesDef, wrapper.readUInt32)
+
+    print(children)
+    controllerKeyDef = ArrayDefinition.fromWrapper(wrapper)
+    controllerDataDef = ArrayDefinition.fromWrapper(wrapper)
+
 
 
 def loadMeta(

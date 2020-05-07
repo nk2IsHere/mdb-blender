@@ -14,6 +14,7 @@ bl_info = {
     "category": "Import-Export"
 }
 
+
 @orientation_helper(axis_forward='Y', axis_up='Z')
 class ImportMDB(bpy.types.Operator, ImportHelper):
     """Import from MDB file format (.mdb, .mba)"""
@@ -40,9 +41,13 @@ class ImportMDB(bpy.types.Operator, ImportHelper):
             return mod.__dict__[c.__name__]
 
         # imports to be updated
+        from . import file_utils, model_data, model_types
         from . import import_mdb
 
-        importlib.reload(import_mdb)  # reload imported module
+        importlib.reload(file_utils)
+        importlib.reload(model_data)
+        importlib.reload(model_types)
+        importlib.reload(import_mdb)
 
         keywords = self.as_keywords(
             ignore=(
@@ -56,6 +61,7 @@ class ImportMDB(bpy.types.Operator, ImportHelper):
         keywords["global_matrix"] = global_matrix
 
         return import_mdb.load(self, context, **keywords)
+
 
 addon_keymaps = []
 

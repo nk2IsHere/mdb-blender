@@ -1,6 +1,8 @@
 import struct
 from functools import reduce
 
+from .model_data import ModelData
+from typing import Callable
 from typing.io import BinaryIO
 
 
@@ -14,7 +16,7 @@ def _dataToString(data):
 # easier to sync code with RedTools
 class FileWrapper(object):
     def __init__(self, content: bytes):
-        super(FileWrapper, self).__init__()
+        super(object, self).__init__()
         self.content = content
         self.offset = 0
 
@@ -81,3 +83,38 @@ class FileWrapper(object):
         instance = cls(file.read())
         file.close()
         return instance
+
+
+# array header containing its size and elements
+class ArrayDefinition(object):
+    def __init__(self, firstElemOffset: int, nbUsedEntries: int, nbAllocatedEntries: int):
+        super(object, self).__init__()
+        self.firstElemOffset = firstElemOffset
+        self.nbUsedEntries = nbUsedEntries
+        self.nbAllocatedEntries = nbAllocatedEntries
+
+    @classmethod
+    def fromWrapper(cls, wrapper: FileWrapper):
+        return cls(
+            firstElemOffset=wrapper.readUInt32(),
+            nbUsedEntries=wrapper.readUInt32(),
+            nbAllocatedEntries=wrapper.readUInt32()
+        )
+
+
+# read array using its definition
+# (all arrays' contents start globally @offsetModelData)
+def readArray(
+    wrapper: FileWrapper,
+    modelData: ModelData,
+    definition: ArrayDefinition,
+    wrapperReaderDelegate: Callable
+):
+    back = wrapper.offset
+    wrapper.seek(modelData.offsetModelData + definition.firstElemOffset)
+    arrayData = [
+        wrapperReaderDelegate() for i in range(definition.nbUsedEntries)
+    ]
+    wrapper.seek(back)
+
+    return arrayData
