@@ -2,22 +2,22 @@ from enum import Enum
 
 
 class NodeType(Enum):
-    kNodeTypeNode = 0x00000001,
-    kNodeTypeLight = 0x00000003,
-    kNodeTypeEmitter = 0x00000005,
-    kNodeTypeCamera = 0x00000009,
-    kNodeTypeReference = 0x00000011,
-    kNodeTypeTrimesh = 0x00000021,
-    kNodeTypeSkin = 0x00000061,
-    kNodeTypeAABB = 0x00000221,
-    kNodeTypeTrigger = 0x00000421,
-    kNodeTypeSectorInfo = 0x00001001,
-    kNodeTypeWalkmesh = 0x00002001,
-    kNodeTypeDanglyNode = 0x00004001,
-    kNodeTypeTexturePaint = 0x00008001,
-    kNodeTypeSpeedTree = 0x00010001,
-    kNodeTypeChain = 0x00020001,
-    kNodeTypeCloth = 0x00040001
+    NodeTypeNode = 0x00000001,
+    NodeTypeLight = 0x00000003,
+    NodeTypeEmitter = 0x00000005,
+    NodeTypeCamera = 0x00000009,
+    NodeTypeReference = 0x00000011,
+    NodeTypeTrimesh = 0x00000021,
+    NodeTypeSkin = 0x00000061,
+    NodeTypeAABB = 0x00000221,
+    NodeTypeTrigger = 0x00000421,
+    NodeTypeSectorInfo = 0x00001001,
+    NodeTypeWalkmesh = 0x00002001,
+    NodeTypeDanglyNode = 0x00004001,
+    NodeTypeTexturePaint = 0x00008001,
+    NodeTypeSpeedTree = 0x00010001,
+    NodeTypeChain = 0x00020001,
+    NodeTypeCloth = 0x00040001
 
 
 class ControllerType(Enum):
@@ -27,6 +27,10 @@ class ControllerType(Enum):
 
 
 class NodeTrimeshControllerType(Enum):
-    kNodeTrimeshControllerTypeSelfIllumColor = 276
-    kNodeTrimeshControllerTypeAlpha = 292
+    ControllerSelfIllumColor = 276
+    ControllerAlpha = 292
 
+
+class ModelMaterialType(Enum):
+    ModelMaterialTypeSolid = 0x0
+    ModelMaterialTypeTransparent = 0x1
