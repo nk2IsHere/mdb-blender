@@ -6,7 +6,8 @@ import bpy
 from bpy_extras.object_utils import object_data_add
 
 from .model_types import ControllerType, NodeTrimeshControllerType, NodeType
-from .model_data import ModelData, StaticControllersData, ControllersData
+from .model_data import ModelData, StaticControllersData, ControllersData, ModelMesh, ModelJoint, _defaultMatrix, \
+    ModelBoundingBox, ModelMaterial, ModelMeshBuffer
 from .file_utils import FileWrapper, ArrayDefinition, readArray
 from mathutils import Matrix, Vector, Quaternion, Color
 
@@ -105,12 +106,200 @@ def getStaticNodeControllers(
     return controllersData
 
 
+def hasTexture(path):
+    return os.path.exists(path)
+
+
+def readTextures(
+    wrapper: FileWrapper,
+    modelData: ModelData
+):
+    wrapper.seek(
+        modelData.offsetRawData + modelData.offsetTexData
+            if modelData.fileVersion == 133
+            else modelData.offsetTexData + modelData.offsetTextureInfo
+    )
+
+    textureCount, offset = wrapper.readUInt32()
+    offTexture, offset = wrapper.readUInt32()
+
+    materialContent = ""
+    for i in range(textureCount):
+        line, offset = wrapper.readStringUntilNull()
+        materialContent += "{}\n".format(line)
+
+    return ModelMaterial.fromString(materialContent)
+
+
+def readMeshNode(
+    wrapper: FileWrapper,
+    modelData: ModelData
+):
+    wrapper.seek(8, relative=True)  # Function pointer
+    offMeshArrays = wrapper.readUInt32()
+
+    wrapper.seek(4, relative=True)  # Unknown
+    nodeBoundingBox = ModelBoundingBox(
+        min=Vector((
+            wrapper.readFloat32(),
+            wrapper.readFloat32(),
+            wrapper.readFloat32()
+        )),
+        max=Vector((
+            wrapper.readFloat32(),
+            wrapper.readFloat32(),
+            wrapper.readFloat32()
+        ))
+    )
+
+    wrapper.seek(28 + 4 + 16, relative=True)  # Unknown, fog scale, Unknown
+    nodeDiffuseColor = Color((
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+    ))
+    nodeAmbientColor = Color((
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+    ))
+    nodeSpecularColor = Color((
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+    ))
+    shininess = wrapper.readFloat32()
+    shadow = wrapper.readUInt32() == 1
+    beaming = wrapper.readUInt32() == 1
+    render = wrapper.readUInt32() == 1
+    transparencyHint = wrapper.readUInt32() == 1
+
+    wrapper.seek(4, relative=True)  # Unknown
+    textureStrings = list(map(
+        lambda textureString: "" if textureString == "NULL" else textureString,
+        [wrapper.readString(64) for i in range(4)]
+    ))
+    tileFade = wrapper.readUInt32() == 1
+    controlFade = wrapper.readByte() == 1
+    lightMapped = wrapper.readByte() == 1
+    rotateTexture = wrapper.readByte() == 1
+
+    wrapper.seek(1, relative=True)  # Unknown
+    transparencyShift = wrapper.readFloat32()
+    defaultRenderList = wrapper.readUInt32()
+    preserveVColors = wrapper.readUInt32()
+    fourCC = wrapper.readUInt32()
+
+    wrapper.seek(4, relative=True)  # Unknown
+    depthOffset = wrapper.readFloat32()
+    coronaCenterMult = wrapper.readFloat32()
+    fadeStartDistance = wrapper.readFloat32()
+    distFromScreenCenterFace = wrapper.readByte() == 1
+
+    wrapper.seek(3, relative=True)  # Unknown
+    enlargeStartDistance = wrapper.readFloat32()
+    affectedByWind = wrapper.readByte() == 1
+    dampFactor = wrapper.readFloat32()
+    blendGroup = wrapper.readUInt32()
+    dayNightLightMaps = wrapper.readByte() == 1
+    dayNightTransition = wrapper.readString(200)
+    ignoreHitCheck = wrapper.readByte() == 1
+    needsReflection = wrapper.readByte() == 1
+
+    wrapper.seek(1, relative=True)  # Unknown
+    reflectionPlaneNormal = [
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+        wrapper.readFloat32()
+    ]
+    reflectionPlaneDistance = wrapper.readFloat32()
+    fadeOnCameraCollision = wrapper.readByte() == 1
+    noSelfShadow = wrapper.readByte() == 1
+    isReflected = wrapper.readByte() == 1
+    onlyReflected = wrapper.readByte() == 1
+    lightMapName = wrapper.readString(64)
+    canDecal = wrapper.readByte() == 1
+    multiBillBoard = wrapper.readByte() == 1
+    ignoreLODReflection = wrapper.readByte() == 1
+
+    wrapper.seek(1, relative=True)  # Unknown
+    detailMapScape = wrapper.readFloat32()
+    modelData.offsetTextureInfo = wrapper.readUInt32()
+
+    wrapper.seek(modelData.offsetRawData, offMeshArrays)
+    wrapper.seek(4, relative=True)
+
+    vertexArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    normalsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    tangentsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    biNormalsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    tVertsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    unknownArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    facesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+
+    modelData.offsetTexData = wrapper.readUInt32() if modelData.fileVersion == 133 else modelData.offsetTexData
+
+    if vertexArrayDefinition.nbUsedEntries == 0 or facesArrayDefinition.nbUsedEntries == 0:
+        return
+
+    material = readTextures(wrapper, modelData)
+    material.setMaterialParameters(
+        diffuseColor=nodeDiffuseColor,
+        ambientColor=nodeAmbientColor,
+        specularColor=nodeSpecularColor,
+        shininess=shininess,
+        shadow=shadow,
+        beaming=beaming,
+        render=render,
+        transparencyHint=transparencyHint,
+        textureStrings=textureStrings,
+        tileFade=tileFade,
+        controlFade=controlFade,
+        lightMapped=lightMapped,
+        rotateTexture=rotateTexture,
+        transparencyShift=transparencyShift,
+        defaultRenderList=defaultRenderList,
+        preserveVColors=preserveVColors,
+        fourCC=fourCC,
+        depthOffset=depthOffset,
+        coronaCenterMult=coronaCenterMult,
+        fadeStartDistance=fadeStartDistance,
+        distFromScreenCenterFace=distFromScreenCenterFace,
+        enlargeStartDistance=enlargeStartDistance,
+        affectedByWind=affectedByWind,
+        dampFactor=dampFactor,
+        blendGroup=blendGroup,
+        dayNightLightMaps=dayNightLightMaps,
+        dayNightTransition=dayNightTransition,
+        ignoreHitCheck=ignoreHitCheck,
+        needsReflection=needsReflection,
+        reflectionPlaneNormal=reflectionPlaneNormal,
+        reflectionPlaneDistance=reflectionPlaneDistance,
+        fadeOnCameraCollision=fadeOnCameraCollision,
+        noSelfShadow=noSelfShadow,
+        isReflected=isReflected,
+        onlyReflected=onlyReflected,
+        lightMapName=lightMapName,
+        canDecal=canDecal,
+        multiBillBoard=multiBillBoard,
+        ignoreLODReflection=ignoreLODReflection,
+        detailMapScape=detailMapScape
+    )
+    meshBuffer = ModelMeshBuffer(
+        material=material,
+        boundingBox=nodeBoundingBox
+    )
+
+
 def loadNode(
     wrapper: FileWrapper,
     modelData: ModelData,
-    parentMesh: Mesh,
-    parentTransform: Matrix = None
+    parentMesh: ModelMesh = None,
+    parentTransform: Matrix = _defaultMatrix()
 ):
+    if parentMesh is None:  # root node
+        parentMesh = ModelMesh()
+
     wrapper.seek(24 + 4, relative=True)  # Function pointers, inherit color flag
     id = wrapper.readUInt32()
     name = wrapper.readString(64)
@@ -130,17 +319,31 @@ def loadNode(
     maxLOD = wrapper.readInt32()
     type = wrapper.readUInt32()
 
-    joint = bpy.data.objects['Armature'].data
-    print(joint)
+    joint = parentMesh.getJointByName(name)
     if joint is None:
-        pass
+        joint = ModelJoint(
+            localMatrix=controllersData.localTransform,
+            globalMatrix=controllersData.globalTransform,
+            name=name,
+            animatedPosition=controllersData.position,
+            animatedScale=controllersData.scale,
+            animatedRotation=controllersData.rotation.invert()
+        )
+        parentMesh.joints.append(joint)
 
+    print('load {} type {}'.format(name, hex(type)))
     if type == NodeType.NodeTypeTrimesh:
         pass
     elif type == NodeType.NodeTypeSpeedTree:
         pass
     elif type == NodeType.NodeTypeTexturePaint:
         pass
+
+    for childOffset in children:
+        wrapper.seek(modelData.offsetModelData + childOffset)
+        loadNode(wrapper, modelData, parentMesh, parentTransform)
+
+    return parentMesh
 
 
 def loadMeta(
@@ -231,5 +434,10 @@ def load(
     #
     # bpy.context.collection.objects.link(obj)
 
-    importedMeshData = loadNode(wrapper, modelData, None, global_matrix)
+    importedMeshData = loadNode(
+        wrapper=wrapper,
+        modelData=modelData,
+        parentMesh=None,
+        parentTransform=global_matrix if global_matrix else _defaultMatrix()
+    )
     return {'FINISHED'}

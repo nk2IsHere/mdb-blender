@@ -29,8 +29,3 @@ class ControllerType(Enum):
 class NodeTrimeshControllerType(Enum):
     ControllerSelfIllumColor = 276
     ControllerAlpha = 292
-
-
-class ModelMaterialType(Enum):
-    ModelMaterialTypeSolid = 0x0
-    ModelMaterialTypeTransparent = 0x1

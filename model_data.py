@@ -4,11 +4,10 @@
 #  [notification to myself]
 import os
 import re
+from enum import Enum
 
 from mathutils import Vector, Quaternion, Matrix, Color, Euler
 from typing import List, Tuple
-
-from .model_types import ModelMaterialType
 
 
 class ModelData(object):
@@ -248,13 +247,58 @@ class ModelVertex(object):
         )
 
 
+class ModelMaterialType(Enum):
+    ModelMaterialTypeSolid = 0x0
+    ModelMaterialTypeTransparent = 0x1
+
+
 class ModelMaterial(object):
     def __init__(self,
                  shader: str = '',
                  textures: List[Tuple[str, str]] = [],
                  bumpmaps: List[Tuple[str, str]] = [],
                  floats: List[Tuple[str, float]] = [],
-                 vectors: List[Tuple[str, Vector]] = []
+                 vectors: List[Tuple[str, Vector]] = [],
+                 diffuseColor: Color = None,
+                 ambientColor: Color = None,
+                 specularColor: Color = None,
+                 shininess: float = None,
+                 shadow: bool = None,
+                 beaming: bool = None,
+                 render: bool = None,
+                 transparencyHint: bool = None,
+                 textureStrings: List[str] = None,
+                 tileFade: bool = None,
+                 controlFade: bool = None,
+                 lightMapped: bool = None,
+                 rotateTexture: bool = None,
+                 transparencyShift: float = None,
+                 defaultRenderList: int = None,
+                 preserveVColors: int = None,
+                 fourCC: int = None,
+                 depthOffset: float = None,
+                 coronaCenterMult: float = None,
+                 fadeStartDistance: float = None,
+                 distFromScreenCenterFace: bool = None,
+                 enlargeStartDistance: float = None,
+                 affectedByWind: bool = None,
+                 dampFactor: float = None,
+                 blendGroup: int = None,
+                 dayNightLightMaps: bool = None,
+                 dayNightTransition: str = None,
+                 ignoreHitCheck: bool = None,
+                 needsReflection: bool = None,
+                 reflectionPlaneNormal: List[float] = None,
+                 reflectionPlaneDistance: float = None,
+                 fadeOnCameraCollision: bool = None,
+                 noSelfShadow: bool = None,
+                 isReflected: bool = None,
+                 onlyReflected: bool = None,
+                 lightMapName: str = None,
+                 canDecal: bool = None,
+                 multiBillBoard: bool = None,
+                 ignoreLODReflection: bool = None,
+                 detailMapScape: float = None
                  ):
         super().__init__()
         self.shader = shader
@@ -262,6 +306,129 @@ class ModelMaterial(object):
         self.bumpmaps = bumpmaps
         self.floats = floats
         self.vectors = vectors
+        self.diffuseColor = diffuseColor
+        self.ambientColor = ambientColor
+        self.specularColor = specularColor
+        self.shininess = shininess
+        self.shadow = shadow
+        self.beaming = beaming
+        self.render = render
+        self.transparencyHint = transparencyHint
+        self.textureStrings = textureStrings
+        self.tileFade = tileFade
+        self.controlFade = controlFade
+        self.lightMapped = lightMapped
+        self.rotateTexture = rotateTexture
+        self.transparencyShift = transparencyShift
+        self.defaultRenderList = defaultRenderList
+        self.preserveVColors = preserveVColors
+        self.fourCC = fourCC
+        self.depthOffset = depthOffset
+        self.coronaCenterMult = coronaCenterMult
+        self.fadeStartDistance = fadeStartDistance
+        self.distFromScreenCenterFace = distFromScreenCenterFace
+        self.enlargeStartDistance = enlargeStartDistance
+        self.affectedByWind = affectedByWind
+        self.dampFactor = dampFactor
+        self.blendGroup = blendGroup
+        self.dayNightLightMaps = dayNightLightMaps
+        self.dayNightTransition = dayNightTransition
+        self.ignoreHitCheck = ignoreHitCheck
+        self.needsReflection = needsReflection
+        self.reflectionPlaneNormal = reflectionPlaneNormal
+        self.reflectionPlaneDistance = reflectionPlaneDistance
+        self.fadeOnCameraCollision = fadeOnCameraCollision
+        self.noSelfShadow = noSelfShadow
+        self.isReflected = isReflected
+        self.onlyReflected = onlyReflected
+        self.lightMapName = lightMapName
+        self.canDecal = canDecal
+        self.multiBillBoard = multiBillBoard
+        self.ignoreLODReflection = ignoreLODReflection
+        self.detailMapScape = detailMapScape
+
+    def setMaterialParameters(self,
+                              diffuseColor: Color,
+                              ambientColor: Color,
+                              specularColor: Color,
+                              shininess: float,
+                              shadow: bool,
+                              beaming: bool,
+                              render: bool,
+                              transparencyHint: bool,
+                              textureStrings: List[str],
+                              tileFade: bool,
+                              controlFade: bool,
+                              lightMapped: bool,
+                              rotateTexture: bool,
+                              transparencyShift: float,
+                              defaultRenderList: int,
+                              preserveVColors: int,
+                              fourCC: int,
+                              depthOffset: float,
+                              coronaCenterMult: float,
+                              fadeStartDistance: float,
+                              distFromScreenCenterFace: bool,
+                              enlargeStartDistance: float,
+                              affectedByWind: bool,
+                              dampFactor: float,
+                              blendGroup: int,
+                              dayNightLightMaps: bool,
+                              dayNightTransition: str,
+                              ignoreHitCheck: bool,
+                              needsReflection: bool,
+                              reflectionPlaneNormal: List[float],
+                              reflectionPlaneDistance: float,
+                              fadeOnCameraCollision: bool,
+                              noSelfShadow: bool,
+                              isReflected: bool,
+                              onlyReflected: bool,
+                              lightMapName: str,
+                              canDecal: bool,
+                              multiBillBoard: bool,
+                              ignoreLODReflection: bool,
+                              detailMapScape: float
+                              ):
+        self.diffuseColor = diffuseColor
+        self.ambientColor = ambientColor
+        self.specularColor = specularColor
+        self.shininess = shininess
+        self.shadow = shadow
+        self.beaming = beaming
+        self.render = render
+        self.transparencyHint = transparencyHint
+        self.textureStrings = textureStrings
+        self.tileFade = tileFade
+        self.controlFade = controlFade
+        self.lightMapped = lightMapped
+        self.rotateTexture = rotateTexture
+        self.transparencyShift = transparencyShift
+        self.defaultRenderList = defaultRenderList
+        self.preserveVColors = preserveVColors
+        self.fourCC = fourCC
+        self.depthOffset = depthOffset
+        self.coronaCenterMult = coronaCenterMult
+        self.fadeStartDistance = fadeStartDistance
+        self.distFromScreenCenterFace = distFromScreenCenterFace
+        self.enlargeStartDistance = enlargeStartDistance
+        self.affectedByWind = affectedByWind
+        self.dampFactor = dampFactor
+        self.blendGroup = blendGroup
+        self.dayNightLightMaps = dayNightLightMaps
+        self.dayNightTransition = dayNightTransition
+        self.ignoreHitCheck = ignoreHitCheck
+        self.needsReflection = needsReflection
+        self.reflectionPlaneNormal = reflectionPlaneNormal
+        self.reflectionPlaneDistance = reflectionPlaneDistance
+        self.fadeOnCameraCollision = fadeOnCameraCollision
+        self.noSelfShadow = noSelfShadow
+        self.isReflected = isReflected
+        self.onlyReflected = onlyReflected
+        self.lightMapName = lightMapName
+        self.canDecal = canDecal
+        self.multiBillBoard = multiBillBoard
+        self.ignoreLODReflection = ignoreLODReflection
+        self.detailMapScape = detailMapScape
 
     def getMaterialTypeFromShader(self):
         return ModelMaterialType.ModelMaterialTypeTransparent \
@@ -370,7 +537,10 @@ class ModelMesh(object):
         self.rotationKeys = rotationKeys
 
     def getJointByName(self, name):
-        return next(filter(lambda joint: joint.name == name, self.joints))
+        try:
+            return next(filter(lambda joint: joint.name == name, self.joints))
+        except StopIteration:
+            return None
 
     def __repr__(self) -> str:
         return "{}({!r})".format(self.__class__.__name__, self.__dict__)
