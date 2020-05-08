@@ -131,14 +131,12 @@ class ControllersData(object):
 
 class ModelWeight(object):
     def __init__(self,
-                 bufferId: int,
                  vertexId: int,
                  strength: float,
                  staticPos: Vector,
                  staticNormal: Vector
                  ):
         super().__init__()
-        self.bufferId = bufferId
         self.vertexId = vertexId
         self.strength = strength
         self.staticPos = staticPos
@@ -307,7 +305,8 @@ class ModelMaterial(object):
                  canDecal: bool = None,
                  multiBillBoard: bool = None,
                  ignoreLODReflection: bool = None,
-                 detailMapScape: float = None
+                 detailMapScape: float = None,
+                 enableSpecular: bool = None,
                  ):
         super().__init__()
         self.shader = shader
@@ -355,6 +354,7 @@ class ModelMaterial(object):
         self.multiBillBoard = multiBillBoard
         self.ignoreLODReflection = ignoreLODReflection
         self.detailMapScape = detailMapScape
+        self.enableSpecular = enableSpecular
 
     def setMaterialParameters(self,
                               diffuseColor: Color = None,
@@ -396,7 +396,8 @@ class ModelMaterial(object):
                               canDecal: bool = None,
                               multiBillBoard: bool = None,
                               ignoreLODReflection: bool = None,
-                              detailMapScape: float = None
+                              detailMapScape: float = None,
+                              enableSpecular: bool = None
                               ):
         self.diffuseColor = diffuseColor
         self.ambientColor = ambientColor
@@ -438,6 +439,7 @@ class ModelMaterial(object):
         self.multiBillBoard = multiBillBoard
         self.ignoreLODReflection = ignoreLODReflection
         self.detailMapScape = detailMapScape
+        self.enableSpecular = enableSpecular
 
     def getMaterialTypeFromShader(self):
         return ModelMaterialType.ModelMaterialTypeTransparent \
@@ -504,6 +506,21 @@ class ModelMaterial(object):
             return instance
 
 
+class ModelTextureLayer(object):
+    def __init__(self,
+                 hasTexture: bool,
+                 texture: str = None,
+                 weights: List[float] = []
+                 ):
+        super().__init__()
+        self.hasTexture = hasTexture
+        self.texture = texture
+        self.weights = weights
+
+    def __repr__(self) -> str:
+        return "{}({!r})".format(self.__class__.__name__, self.__dict__)
+
+
 class ModelMeshBuffer(object):
     def __init__(self,
                  material: ModelMaterial = None,
@@ -515,7 +532,8 @@ class ModelMeshBuffer(object):
                  normal: Vector = None,
                  tCoords: Vector = None,
                  primitives: list = [],
-                 transformation: Matrix = _defaultMatrix()
+                 transformation: Matrix = _defaultMatrix(),
+                 textureLayers: List[ModelTextureLayer] = [],
                  ):
         super().__init__()
         self.material = material
@@ -528,6 +546,7 @@ class ModelMeshBuffer(object):
         self.tCoords = tCoords
         self.primitives = primitives
         self.transformation = transformation
+        self.textureLayers = textureLayers
 
     def __repr__(self) -> str:
         return "{}({!r})".format(self.__class__.__name__, self.__dict__)
