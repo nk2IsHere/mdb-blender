@@ -226,12 +226,21 @@ class ModelBoundingBox(object):
 
 
 class ModelVertex(object):
-    def __init__(self, position: Vector, normal: Vector, color: Color, tCoords: Vector):
+    def __init__(self,
+                 position: Vector = None,
+                 normal: Vector = None,
+                 color: Color = None,
+                 tCoords: Vector = None,
+                 biNormal: Vector = None,
+                 tangent: Vector = None
+                 ):
         super().__init__()
         self.position = position
         self.normal = normal
         self.color = color
         self.tCoords = tCoords
+        self.biNormal = biNormal
+        self.tangent = tangent
 
     def __repr__(self) -> str:
         return "{}({!r})".format(self.__class__.__name__, self.__dict__)
@@ -348,46 +357,46 @@ class ModelMaterial(object):
         self.detailMapScape = detailMapScape
 
     def setMaterialParameters(self,
-                              diffuseColor: Color,
-                              ambientColor: Color,
-                              specularColor: Color,
-                              shininess: float,
-                              shadow: bool,
-                              beaming: bool,
-                              render: bool,
-                              transparencyHint: bool,
-                              textureStrings: List[str],
-                              tileFade: bool,
-                              controlFade: bool,
-                              lightMapped: bool,
-                              rotateTexture: bool,
-                              transparencyShift: float,
-                              defaultRenderList: int,
-                              preserveVColors: int,
-                              fourCC: int,
-                              depthOffset: float,
-                              coronaCenterMult: float,
-                              fadeStartDistance: float,
-                              distFromScreenCenterFace: bool,
-                              enlargeStartDistance: float,
-                              affectedByWind: bool,
-                              dampFactor: float,
-                              blendGroup: int,
-                              dayNightLightMaps: bool,
-                              dayNightTransition: str,
-                              ignoreHitCheck: bool,
-                              needsReflection: bool,
-                              reflectionPlaneNormal: List[float],
-                              reflectionPlaneDistance: float,
-                              fadeOnCameraCollision: bool,
-                              noSelfShadow: bool,
-                              isReflected: bool,
-                              onlyReflected: bool,
-                              lightMapName: str,
-                              canDecal: bool,
-                              multiBillBoard: bool,
-                              ignoreLODReflection: bool,
-                              detailMapScape: float
+                              diffuseColor: Color = None,
+                              ambientColor: Color = None,
+                              specularColor: Color = None,
+                              shininess: float = None,
+                              shadow: bool = None,
+                              beaming: bool = None,
+                              render: bool = None,
+                              transparencyHint: bool = None,
+                              textureStrings: List[str] = None,
+                              tileFade: bool = None,
+                              controlFade: bool = None,
+                              lightMapped: bool = None,
+                              rotateTexture: bool = None,
+                              transparencyShift: float = None,
+                              defaultRenderList: int = None,
+                              preserveVColors: int = None,
+                              fourCC: int = None,
+                              depthOffset: float = None,
+                              coronaCenterMult: float = None,
+                              fadeStartDistance: float = None,
+                              distFromScreenCenterFace: bool = None,
+                              enlargeStartDistance: float = None,
+                              affectedByWind: bool = None,
+                              dampFactor: float = None,
+                              blendGroup: int = None,
+                              dayNightLightMaps: bool = None,
+                              dayNightTransition: str = None,
+                              ignoreHitCheck: bool = None,
+                              needsReflection: bool = None,
+                              reflectionPlaneNormal: List[float] = None,
+                              reflectionPlaneDistance: float = None,
+                              fadeOnCameraCollision: bool = None,
+                              noSelfShadow: bool = None,
+                              isReflected: bool = None,
+                              onlyReflected: bool = None,
+                              lightMapName: str = None,
+                              canDecal: bool = None,
+                              multiBillBoard: bool = None,
+                              ignoreLODReflection: bool = None,
+                              detailMapScape: float = None
                               ):
         self.diffuseColor = diffuseColor
         self.ambientColor = ambientColor
@@ -506,9 +515,19 @@ class ModelMeshBuffer(object):
                  normal: Vector = None,
                  tCoords: Vector = None,
                  primitives: list = [],
-                 transformation: Matrix = Matrix()
+                 transformation: Matrix = _defaultMatrix()
                  ):
         super().__init__()
+        self.material = material
+        self.vertexType = vertexType
+        self.vertices = vertices
+        self.indices = indices
+        self.boundingBox = boundingBox
+        self.position = position
+        self.normal = normal
+        self.tCoords = tCoords
+        self.primitives = primitives
+        self.transformation = transformation
 
     def __repr__(self) -> str:
         return "{}({!r})".format(self.__class__.__name__, self.__dict__)

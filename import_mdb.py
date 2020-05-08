@@ -1,13 +1,15 @@
 # nk2's craft made of plasticine (level: Kindergarten, 1 year)
 # heavily based on https://github.com/JLouis-B/RedTools/blob/master/W2ENT_QT/IO_MeshLoader_WitcherMDL.cpp
 import os
+from itertools import chain
 
 import bpy
 from bpy_extras.object_utils import object_data_add
+from typing import List
 
 from .model_types import ControllerType, NodeTrimeshControllerType, NodeType
 from .model_data import ModelData, StaticControllersData, ControllersData, ModelMesh, ModelJoint, _defaultMatrix, \
-    ModelBoundingBox, ModelMaterial, ModelMeshBuffer
+    ModelBoundingBox, ModelMaterial, ModelMeshBuffer, ModelVertex
 from .file_utils import FileWrapper, ArrayDefinition, readArray
 from mathutils import Matrix, Vector, Quaternion, Color
 
@@ -106,8 +108,26 @@ def getStaticNodeControllers(
     return controllersData
 
 
-def hasTexture(path):
-    return os.path.exists(path)
+def getTexture(
+    modelData: ModelData,
+    name: str
+):
+    try:
+        return next(
+            list(filter(
+                lambda path: os.path.exists(path),
+                chain.from_iterable(map(
+                    lambda ext: list(map(
+                        lambda folder: os.path.join(modelData.baseDirectory, folder, '{}.{}'.format(name, ext)),
+                        ['meshes00', 'textures00', 'textures01']
+                    )),
+                    ['dds', 'txi', 'jpg', 'jpeg']
+                ))
+            ))
+        )
+    except StopIteration:
+        return None
+
 
 
 def readTextures(
@@ -129,6 +149,50 @@ def readTextures(
         materialContent += "{}\n".format(line)
 
     return ModelMaterial.fromString(materialContent)
+
+
+def evaluateTextures(
+    modelData: ModelData,
+    material: ModelMaterial,
+    textureCount: int,
+    staticTextureStrings: List[str],
+    tVertsArrayDefinitions: List[ArrayDefinition],
+    lightMapDayNight: bool,
+    lightMapName: str
+):
+    material.textures = [
+        material.textures[i] if len(material.textures) >= i else ""
+            for i in range(textureCount)
+    ]
+
+    for t in range(textureCount):
+        if material.textures[t] == "" and staticTextureStrings is not None:
+            material.textures[t] = staticTextureStrings[t]
+
+        if tVertsArrayDefinitions[t].nbUsedEntries == 0:
+            material.textures[t] = ""
+
+        if material.textures[t] == "":
+            continue
+
+        if lightMapDayNight and material.textures[t] == lightMapName:
+            if getTexture(modelData, material.textures[t] + "!d") is not None:  # dzien
+                material.textures[t] += "!d"
+            elif getTexture(modelData, material.textures[t] + "!r") is not None:  # rano
+                material.textures[t] += "!r"
+            elif getTexture(modelData, material.textures[t] + "!p") is not None:  # poludzien
+                material.textures[t] += "!p"
+            elif getTexture(modelData, material.textures[t] + "!w") is not None:  # wieczor
+                material.textures[t] += "!w"
+            elif getTexture(modelData, material.textures[t] + "!n") is not None:  # noc
+                material.textures[t] += "!n"
+            else:
+                material.textures[t] = ""
+
+    material.textures = list(filter(
+        lambda texture: texture != "",
+        material.textures
+    ))
 
 
 def readMeshNode(
@@ -233,7 +297,9 @@ def readMeshNode(
     normalsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
     tangentsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
     biNormalsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
-    tVertsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    tVertsArrayDefinitions = [
+        ArrayDefinition.fromWrapper(wrapper) for i in range(4)
+    ]
     unknownArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
     facesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
 
@@ -242,7 +308,14 @@ def readMeshNode(
     if vertexArrayDefinition.nbUsedEntries == 0 or facesArrayDefinition.nbUsedEntries == 0:
         return
 
+    wrapper.seek(24 + 12, relative=True)
+    weightsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    weights = readArray(wrapper, modelData, weightsArrayDefinition, wrapper.readFloat32)
+    bonesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    bones = readArray(wrapper, modelData, bonesArrayDefinition, wrapper.readUByte)
+
     material = readTextures(wrapper, modelData)
+    evaluateTextures(modelData, material, 4, textureStrings, tVertsArrayDefinitions, dayNightLightMaps, lightMapName)
     material.setMaterialParameters(
         diffuseColor=nodeDiffuseColor,
         ambientColor=nodeAmbientColor,
@@ -289,6 +362,80 @@ def readMeshNode(
         material=material,
         boundingBox=nodeBoundingBox
     )
+    meshBuffer.vertices = [
+        ModelVertex() for i in range(max(
+            vertexArrayDefinition.nbUsedEntries,
+            normalsArrayDefinition.nbUsedEntries,
+            tangentsArrayDefinition.nbUsedEntries,
+            biNormalsArrayDefinition.nbUsedEntries
+        ))
+    ]
+
+    wrapper.seek(modelData.offsetRawData + vertexArrayDefinition.firstElemOffest)
+    for i in range(vertexArrayDefinition.nbUsedEntries):
+        meshBuffer.vertices[i].position = Vector((
+            wrapper.readFloat32(),
+            wrapper.readFloat32(),
+            wrapper.readFloat32()
+        ))
+        meshBuffer.vertices[i].color = Color((1.0, 1.0, 1.0))
+        meshBuffer.vertices[i].tCoords = Vector((0.0, 0.0))
+
+    wrapper.seek(modelData.offsetRawData + normalsArrayDefinition.firstElemOffest)
+    for i in range(normalsArrayDefinition.nbUsedEntries):
+        meshBuffer.vertices[i].normal = Vector((
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32()  # wrapper.readInt16() / 8192
+        ))
+
+    wrapper.seek(modelData.offsetRawData + tangentsArrayDefinition.firstElemOffest)
+    for i in range(tangentsArrayDefinition.nbUsedEntries):
+        meshBuffer.vertices[i].tangent = Vector((
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32()  # wrapper.readInt16() / 8192
+        ))
+
+    wrapper.seek(modelData.offsetRawData + biNormalsArrayDefinition.firstElemOffest)
+    for i in range(biNormalsArrayDefinition.nbUsedEntries):
+        meshBuffer.vertices[i].biNormal = Vector((
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32()  # wrapper.readInt16() / 8192
+        ))
+
+    wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffest)
+    meshBuffer.indices = [0 for i in range(facesArrayDefinition.nbUsedEntries * 3)]
+    for i in range(facesArrayDefinition.nbUsedEntries):
+        wrapper.seek(4 * 4 + 4, relative=True)
+        if modelData.fileVersion == 133:
+            wrapper.seek(3 * 4, relative=True)
+
+        meshBuffer.indices[i * 3 + 0] = wrapper.readUInt32()
+        meshBuffer.indices[i * 3 + 1] = wrapper.readUInt32()
+        meshBuffer.indices[i * 3 + 2] = wrapper.readUInt32()
+
+        if modelData.fileVersion == 133:
+            wrapper.seek(4, relative=True)
+
+    for t in range(len(material.textures)):
+        wrapper.seek(modelData.offsetRawData + tVertsArrayDefinitions[t].firstElemOffest)
+        for i in range(tVertsArrayDefinitions[t].nbUsedEntries):
+            meshBuffer.vertices[i + 2].tCoords = Vector((
+                wrapper.readFloat32(),
+                wrapper.readFloat32()
+            ))
+
+    # TODO load custom materials based on textureStrings[0] (typically will be __shader__)
+    return meshBuffer
+
+
+# def readTexturePaintNode(
+#     wrapper: FileWrapper,
+#     modelData: ModelData
+# ):
+#
 
 
 def loadNode(
@@ -333,9 +480,10 @@ def loadNode(
 
     print('load {} type {}'.format(name, hex(type)))
     if type == NodeType.NodeTypeTrimesh:
-        pass
+        meshBuffer = readMeshNode(wrapper, modelData)
     elif type == NodeType.NodeTypeSpeedTree:
-        pass
+        print('SPT NODE HERE')
+        # TODO load spt nodes if required
     elif type == NodeType.NodeTypeTexturePaint:
         pass
 
