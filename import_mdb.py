@@ -7,7 +7,7 @@ import bpy
 from bpy_extras.object_utils import object_data_add
 from typing import List, Optional, Tuple
 
-from .model_types import ControllerType, NodeTrimeshControllerType, NodeType
+from .model_types import ControllerType, NodeType
 from .model_data import ModelData, StaticControllersData, ControllersData, ModelMesh, ModelJoint, _defaultMatrix, \
     ModelBoundingBox, ModelMaterial, ModelMeshBuffer, ModelVertex, ModelTextureLayer
 from .file_utils import FileWrapper, ArrayDefinition, readArray
@@ -27,7 +27,7 @@ def readNodeControllers(
 
     wrapper.seek(modelData.offsetModelData + controllerKeyDef.firstElemOffset)
     for i in range(controllerKeyDef.nbUsedEntries):
-        controllerType = wrapper.readUInt32()
+        controllerType = ControllerType(wrapper.readUInt32())
         nbRows = wrapper.readInt16()
         firstKeyIndex = wrapper.readInt16()
         firstValueIndex = wrapper.readInt16()
@@ -63,7 +63,7 @@ def readNodeControllers(
                     controllerData[offset + firstValueIndex],
                     controllerData[offset + firstValueIndex]
                 )))
-        elif controllerType == NodeTrimeshControllerType.ControllerSelfIllumColor:
+        elif controllerType == ControllerType.ControllerSelfIllumColor:
             for j in range(nbRows):
                 offset = j * nbColumns
                 controllers.selfIllumColorTime.append(controllerData[firstKeyIndex + j])
@@ -72,7 +72,7 @@ def readNodeControllers(
                     controllerData[offset + firstValueIndex + 1],
                     controllerData[offset + firstValueIndex + 2]
                 )))
-        elif controllerType == NodeTrimeshControllerType.ControllerAlpha:
+        elif controllerType == ControllerType.ControllerAlpha:
             for j in range(nbRows):
                 offset = j * nbColumns
                 controllers.alphaTime.append(controllerData[firstKeyIndex + j])
@@ -646,6 +646,7 @@ def loadNode(
     modelData: ModelData,
     parentMesh: ModelMesh = None,
     parentTransform: Matrix = _defaultMatrix(),
+    # why the fuck in petooh THIS IS A POINTER FOR EVERY RECURSIVE CALL?!
     postLoad: List[Tuple[int, StaticControllersData, ModelJoint]] = []
 ):
     if parentMesh is None:  # root node
@@ -668,7 +669,7 @@ def loadNode(
     wrapper.seek(4 + 8, relative=True)  # node flags/type, fixed rot + imposter group ?
     minLOD = wrapper.readInt32()
     maxLOD = wrapper.readInt32()
-    type = wrapper.readUInt32()
+    type = NodeType(wrapper.readUInt32())
 
     joint = parentMesh.getJointByName(name)
     if joint is None:
@@ -682,7 +683,7 @@ def loadNode(
         )
         parentMesh.joints.append(joint)
 
-    print('load {} type {}'.format(name, hex(type)))
+    print('load {} type {}'.format(name, type))
 
     meshBuffer = None
     if type == NodeType.NodeTypeTrimesh:
@@ -701,9 +702,8 @@ def loadNode(
 
     for childOffset in children:
         wrapper.seek(modelData.offsetModelData + childOffset)
-
-        _, postLoadChild = loadNode(wrapper, modelData, parentMesh, parentTransform)
-        postLoad.append(*postLoadChild)
+        _, postLoadChild = loadNode(wrapper, modelData, parentMesh, parentTransform, [])
+        postLoad += postLoadChild
 
     return parentMesh, postLoad
 
@@ -802,4 +802,6 @@ def load(
         parentMesh=None,
         parentTransform=global_matrix if global_matrix else _defaultMatrix()
     )
+    print(postLoad)
+
     return {'FINISHED'}
