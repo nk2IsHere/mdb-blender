@@ -9,7 +9,7 @@ from typing.io import BinaryIO
 # simple method to read string from something like 0x[ASCII]dcdcdcdcdc...00
 def _dataToString(data):
     return reduce(
-        lambda acc, next: acc + next.decode('utf-8') if next != b'\xdc' else acc, data, ""
+        lambda acc, next: acc + next.decode('utf-8') if next != b'\xdc' and next.isascii() else acc, data, ""
     )
 
 

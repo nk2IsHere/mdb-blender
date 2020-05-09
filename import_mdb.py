@@ -6,15 +6,15 @@ from itertools import chain
 import bpy
 from bpy_extras.object_utils import object_data_add
 from typing import List, Optional, Tuple
+from mathutils import Matrix, Vector, Quaternion, Color
 
 from .model_types import ControllerType, NodeType
 from .model_data import ModelData, StaticControllersData, ControllersData, ModelMesh, ModelJoint, _defaultMatrix, \
-    ModelBoundingBox, ModelMaterial, ModelMeshBuffer, ModelVertex, ModelTextureLayer
+    ModelBoundingBox, ModelMaterial, ModelMeshBuffer, ModelVertex, ModelTextureLayer, ModelWeight
 from .file_utils import FileWrapper, ArrayDefinition, readArray
-from mathutils import Matrix, Vector, Quaternion, Color
 
 
-#  Function that reads all animation in mdb-eqsue format
+#  Function that reads all controllers in mdb-eqsue format
 def readNodeControllers(
     wrapper: FileWrapper,
     modelData: ModelData,
@@ -34,7 +34,6 @@ def readNodeControllers(
         nbColumns = wrapper.readUByte()
 
         wrapper.seek(1, relative=True)
-        #  FIXME: seems, that every j in nbRows means absolutely different animation, maybe we should split it?
         if controllerType == ControllerType.ControllerPosition:
             for j in range(nbRows):
                 offset = j * nbColumns
@@ -47,7 +46,7 @@ def readNodeControllers(
         elif controllerType == ControllerType.ControllerOrientation:
             for j in range(nbRows):
                 offset = j * nbColumns
-                controllers.positionTime.append(controllerData[firstKeyIndex + j])
+                controllers.rotationTime.append(controllerData[firstKeyIndex + j])
                 controllers.rotation.append(Quaternion((
                     controllerData[offset + firstValueIndex],
                     controllerData[offset + firstValueIndex + 1],
@@ -139,12 +138,12 @@ def readTextures(
             else modelData.offsetTexData + modelData.offsetTextureInfo
     )
 
-    textureCount, offset = wrapper.readUInt32()
-    offTexture, offset = wrapper.readUInt32()
+    textureCount = wrapper.readUInt32()
+    offTexture = wrapper.readUInt32()
 
     materialContent = ""
     for i in range(textureCount):
-        line, offset = wrapper.readStringUntilNull()
+        line = wrapper.readStringUntilNull()
         materialContent += "{}\n".format(line)
 
     return ModelMaterial.fromString(materialContent)
@@ -160,7 +159,7 @@ def evaluateTextures(
     lightMapName: str
 ):
     material.textures = [
-        material.textures[i] if len(material.textures) >= i else ""
+        material.textures[i] if len(material.textures) > i else ""
             for i in range(textureCount)
     ]
 
@@ -264,6 +263,8 @@ def readMeshNode(
     affectedByWind = wrapper.readByte() == 1
     dampFactor = wrapper.readFloat32()
     blendGroup = wrapper.readUInt32()
+
+    wrapper.seek(3, relative=True)  # Unknown # FIXME if here fails, maybe this is the reason
     dayNightLightMaps = wrapper.readByte() == 1
     dayNightTransition = wrapper.readString(200)
     ignoreHitCheck = wrapper.readByte() == 1
@@ -368,7 +369,7 @@ def readMeshNode(
         ))
     ]
 
-    wrapper.seek(modelData.offsetRawData + vertexArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + vertexArrayDefinition.firstElemOffset)
     for i in range(vertexArrayDefinition.nbUsedEntries):
         meshBuffer.vertices[i].position = Vector((
             wrapper.readFloat32(),
@@ -378,7 +379,7 @@ def readMeshNode(
         meshBuffer.vertices[i].color = Color((1.0, 1.0, 1.0))
         meshBuffer.vertices[i].tCoords = Vector((0.0, 0.0))
 
-    wrapper.seek(modelData.offsetRawData + normalsArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + normalsArrayDefinition.firstElemOffset)
     for i in range(normalsArrayDefinition.nbUsedEntries):
         meshBuffer.vertices[i].normal = Vector((
             wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
@@ -386,7 +387,7 @@ def readMeshNode(
             wrapper.readFloat32()  # wrapper.readInt16() / 8192
         ))
 
-    wrapper.seek(modelData.offsetRawData + tangentsArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + tangentsArrayDefinition.firstElemOffset)
     for i in range(tangentsArrayDefinition.nbUsedEntries):
         meshBuffer.vertices[i].tangent = Vector((
             wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
@@ -394,7 +395,7 @@ def readMeshNode(
             wrapper.readFloat32()  # wrapper.readInt16() / 8192
         ))
 
-    wrapper.seek(modelData.offsetRawData + biNormalsArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + biNormalsArrayDefinition.firstElemOffset)
     for i in range(biNormalsArrayDefinition.nbUsedEntries):
         meshBuffer.vertices[i].biNormal = Vector((
             wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
@@ -402,7 +403,7 @@ def readMeshNode(
             wrapper.readFloat32()  # wrapper.readInt16() / 8192
         ))
 
-    wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffset)
     meshBuffer.indices = [0 for i in range(facesArrayDefinition.nbUsedEntries * 3)]
     for i in range(facesArrayDefinition.nbUsedEntries):
         wrapper.seek(4 * 4 + 4, relative=True)
@@ -417,9 +418,9 @@ def readMeshNode(
             wrapper.seek(4, relative=True)
 
     for t in range(len(material.textures)):
-        wrapper.seek(modelData.offsetRawData + tVertsArrayDefinitions[t].firstElemOffest)
+        wrapper.seek(modelData.offsetRawData + tVertsArrayDefinitions[t].firstElemOffset)
         for i in range(tVertsArrayDefinitions[t].nbUsedEntries):
-            meshBuffer.vertices[i + 2].tCoords = Vector((
+            meshBuffer.vertices[i].tCoords = Vector((
                 wrapper.readFloat32(),
                 wrapper.readFloat32()
             ))
@@ -581,7 +582,7 @@ def readTexturePaintNode(
         ))
     ]
 
-    wrapper.seek(modelData.offsetRawData + vertexArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + vertexArrayDefinition.firstElemOffset)
     for i in range(vertexArrayDefinition.nbUsedEntries):
         meshBuffer.vertices[i].position = Vector((
             wrapper.readFloat32(),
@@ -591,7 +592,7 @@ def readTexturePaintNode(
         meshBuffer.vertices[i].color = Color((1.0, 1.0, 1.0))
         meshBuffer.vertices[i].tCoords = Vector((0.0, 0.0))
 
-    wrapper.seek(modelData.offsetRawData + normalsArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + normalsArrayDefinition.firstElemOffset)
     for i in range(normalsArrayDefinition.nbUsedEntries):
         meshBuffer.vertices[i].normal = Vector((
             wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
@@ -599,7 +600,7 @@ def readTexturePaintNode(
             wrapper.readFloat32()  # wrapper.readInt16() / 8192
         ))
 
-    wrapper.seek(modelData.offsetRawData + tangentsArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + tangentsArrayDefinition.firstElemOffset)
     for i in range(tangentsArrayDefinition.nbUsedEntries):
         meshBuffer.vertices[i].tangent = Vector((
             wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
@@ -607,7 +608,7 @@ def readTexturePaintNode(
             wrapper.readFloat32()  # wrapper.readInt16() / 8192
         ))
 
-    wrapper.seek(modelData.offsetRawData + biNormalsArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + biNormalsArrayDefinition.firstElemOffset)
     for i in range(biNormalsArrayDefinition.nbUsedEntries):
         meshBuffer.vertices[i].biNormal = Vector((
             wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
@@ -615,7 +616,7 @@ def readTexturePaintNode(
             wrapper.readFloat32()  # wrapper.readInt16() / 8192
         ))
 
-    wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffest)
+    wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffset)
     meshBuffer.indices = [0 for i in range(facesArrayDefinition.nbUsedEntries * 3)]
     for i in range(facesArrayDefinition.nbUsedEntries):
         wrapper.seek(4 * 4 + 4, relative=True)
@@ -630,15 +631,293 @@ def readTexturePaintNode(
             wrapper.seek(4, relative=True)
 
     for t in range(len(material.textures)):
-        wrapper.seek(modelData.offsetRawData + tVertsArrayDefinitions[t].firstElemOffest)
+        wrapper.seek(modelData.offsetRawData + tVertsArrayDefinitions[t].firstElemOffset)
         for i in range(tVertsArrayDefinitions[t].nbUsedEntries):
-            meshBuffer.vertices[i + 2].tCoords = Vector((
+            meshBuffer.vertices[i].tCoords = Vector((
                 wrapper.readFloat32(),
                 wrapper.readFloat32()
             ))
 
     # TODO load custom materials based on textureStrings[0] (typically will be __shader__)
     return meshBuffer
+
+
+def readSkinNode(
+    wrapper: FileWrapper,
+    modelData: ModelData,
+    parentMesh: ModelMesh
+):
+    # TODO UNITE MESH HEADER (0x0 to 0x270)
+    wrapper.seek(8, relative=True)  # Function pointer
+    offMeshArrays = wrapper.readUInt32()
+
+    wrapper.seek(4, relative=True)  # Unknown
+    nodeBoundingBox = ModelBoundingBox(
+        min=Vector((
+            wrapper.readFloat32(),
+            wrapper.readFloat32(),
+            wrapper.readFloat32()
+        )),
+        max=Vector((
+            wrapper.readFloat32(),
+            wrapper.readFloat32(),
+            wrapper.readFloat32()
+        ))
+    )
+    wrapper.seek(28 + 4 + 16, relative=True)  # Unknown, fog scale, Unknown
+    nodeDiffuseColor = Color((
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+    ))
+    nodeAmbientColor = Color((
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+    ))
+    nodeSpecularColor = Color((
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+        wrapper.readFloat32(),
+    ))
+    shininess = wrapper.readFloat32()
+    shadow = wrapper.readUInt32() == 1
+    beaming = wrapper.readUInt32() == 1
+    render = wrapper.readUInt32() == 1
+    transparencyHint = wrapper.readUInt32() == 1
+
+    wrapper.seek(4, relative=True)  # Unknown
+    textureStrings = list(map(
+        lambda textureString: "" if textureString == "NULL" else textureString,
+        [wrapper.readString(64) for i in range(4)]
+    ))
+    tileFade = wrapper.readUInt32() == 1
+    controlFade = wrapper.readByte() == 1
+    lightMapped = wrapper.readByte() == 1
+    rotateTexture = wrapper.readByte() == 1
+
+    wrapper.seek(1, relative=True)  # Unknown
+    transparencyShift = wrapper.readFloat32()
+    defaultRenderList = wrapper.readUInt32()
+    preserveVColors = wrapper.readUInt32()
+    fourCC = wrapper.readUInt32()
+
+    wrapper.seek(4, relative=True)  # Unknown
+    depthOffset = wrapper.readFloat32()
+    coronaCenterMult = wrapper.readFloat32()
+    fadeStartDistance = wrapper.readFloat32()
+    distFromScreenCenterFace = wrapper.readByte() == 1
+
+    wrapper.seek(3, relative=True)  # Unknown
+    enlargeStartDistance = wrapper.readFloat32()
+    affectedByWind = wrapper.readByte() == 1
+    dampFactor = wrapper.readFloat32()
+    blendGroup = wrapper.readUInt32()
+
+    wrapper.seek(3, relative=True)  # Unknown
+    dayNightLightMaps = wrapper.readByte()
+    dayNightTransition = wrapper.readString(200)
+    ignoreHitCheck = wrapper.readByte() == 1
+    needsReflection = wrapper.readByte() == 1
+
+    wrapper.seek(1, relative=True)  # Unknown
+    reflectionPlaneNormal = [
+        wrapper.readFloat32() for i in range(3)
+    ]
+    reflectionPlaneDistance = wrapper.readFloat32()
+    fadeOnCameraCollision = wrapper.readByte() == 1
+    noSelfShadow = wrapper.readByte() == 1
+    isReflected = wrapper.readByte() == 1
+    onlyReflected = wrapper.readByte() == 1
+    lightMapName = wrapper.readString(64)
+    canDecal = wrapper.readByte() == 1
+    multiBillBoard = wrapper.readByte() == 1
+    ignoreLODReflection = wrapper.readByte() == 1
+    enableSpecular = wrapper.readByte() == 1
+    detailMapScape = wrapper.readFloat32()
+    modelData.offsetTextureInfo = wrapper.readUInt32()
+
+    wrapper.seek(4, relative=True)
+    bonesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+
+    back = wrapper.offset
+    wrapper.seek(modelData.offsetTexData + bonesArrayDefinition.firstElemOffset)
+    bones = []
+    for i in range(bonesArrayDefinition.nbUsedEntries):
+        boneId = wrapper.readUInt32()
+        boneName = wrapper.readString(92).split('+')[0]  # FIXME seems to collect garbage
+        joint = parentMesh.getJointByName(boneName)
+        bones.append(joint)
+
+    wrapper.seek(back)
+    wrapper.seek(4, relative=True)
+    vertexArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    normalsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    tangentsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    biNormalsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    tVertsArrayDefinitions = [
+        ArrayDefinition.fromWrapper(wrapper) for i in range(4)
+    ]
+    unknownArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    facesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+
+    modelData.offsetTexData = wrapper.readUInt32() if modelData.fileVersion == 133 else modelData.offsetTexData
+
+    if vertexArrayDefinition.nbUsedEntries == 0 or facesArrayDefinition.nbUsedEntries == 0:
+        return
+
+    wrapper.seek(24 + 12, relative=True)
+    weightsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    weights = readArray(wrapper, modelData, weightsArrayDefinition, wrapper.readFloat32)
+    bonesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    bones = readArray(wrapper, modelData, bonesArrayDefinition, wrapper.readUByte)
+
+    material = readTextures(wrapper, modelData)
+    evaluateTextures(modelData, material, 4, textureStrings, tVertsArrayDefinitions, dayNightLightMaps, lightMapName)
+    material.setMaterialParameters(
+        diffuseColor=nodeDiffuseColor,
+        ambientColor=nodeAmbientColor,
+        specularColor=nodeSpecularColor,
+        shininess=shininess,
+        shadow=shadow,
+        beaming=beaming,
+        render=render,
+        transparencyHint=transparencyHint,
+        textureStrings=textureStrings,
+        tileFade=tileFade,
+        controlFade=controlFade,
+        lightMapped=lightMapped,
+        rotateTexture=rotateTexture,
+        transparencyShift=transparencyShift,
+        defaultRenderList=defaultRenderList,
+        preserveVColors=preserveVColors,
+        fourCC=fourCC,
+        depthOffset=depthOffset,
+        coronaCenterMult=coronaCenterMult,
+        fadeStartDistance=fadeStartDistance,
+        distFromScreenCenterFace=distFromScreenCenterFace,
+        enlargeStartDistance=enlargeStartDistance,
+        affectedByWind=affectedByWind,
+        dampFactor=dampFactor,
+        blendGroup=blendGroup,
+        dayNightLightMaps=dayNightLightMaps,
+        dayNightTransition=dayNightTransition,
+        ignoreHitCheck=ignoreHitCheck,
+        needsReflection=needsReflection,
+        reflectionPlaneNormal=reflectionPlaneNormal,
+        reflectionPlaneDistance=reflectionPlaneDistance,
+        fadeOnCameraCollision=fadeOnCameraCollision,
+        noSelfShadow=noSelfShadow,
+        isReflected=isReflected,
+        onlyReflected=onlyReflected,
+        lightMapName=lightMapName,
+        canDecal=canDecal,
+        multiBillBoard=multiBillBoard,
+        ignoreLODReflection=ignoreLODReflection,
+        detailMapScape=detailMapScape,
+        enableSpecular=enableSpecular
+    )
+    meshBuffer = ModelMeshBuffer(
+        material=material,
+        boundingBox=nodeBoundingBox
+    )
+    meshBuffer.vertices = [
+        ModelVertex() for i in range(max(
+            vertexArrayDefinition.nbUsedEntries,
+            normalsArrayDefinition.nbUsedEntries,
+            tangentsArrayDefinition.nbUsedEntries,
+            biNormalsArrayDefinition.nbUsedEntries
+        ))
+    ]
+
+    wrapper.seek(modelData.offsetRawData + vertexArrayDefinition.firstElemOffset)
+    skinningIndex = 0
+    for i in range(vertexArrayDefinition.nbUsedEntries):
+        meshBuffer.vertices[i].position = Vector((
+            wrapper.readFloat32(),
+            wrapper.readFloat32(),
+            wrapper.readFloat32()
+        ))
+        meshBuffer.vertices[i].color = Color((1.0, 1.0, 1.0))
+        meshBuffer.vertices[i].tCoords = Vector((0.0, 0.0))
+        for j in range(4):  # Skinning of the vertex
+            currentSkinningIndex = skinningIndex
+            skinningIndex += 1
+            boneId = bones[currentSkinningIndex]
+            if boneId == 255:
+                continue
+
+            if boneId < len(bones):
+                weight = weights[currentSkinningIndex]
+                parentMesh.weights.append(ModelWeight(
+                    vertexId=i,
+                    strength=weight
+                ))
+
+    wrapper.seek(modelData.offsetRawData + normalsArrayDefinition.firstElemOffset)
+    for i in range(normalsArrayDefinition.nbUsedEntries):
+        meshBuffer.vertices[i].normal = Vector((
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32()  # wrapper.readInt16() / 8192
+        ))
+
+    wrapper.seek(modelData.offsetRawData + tangentsArrayDefinition.firstElemOffset)
+    for i in range(tangentsArrayDefinition.nbUsedEntries):
+        meshBuffer.vertices[i].tangent = Vector((
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32()  # wrapper.readInt16() / 8192
+        ))
+
+    wrapper.seek(modelData.offsetRawData + biNormalsArrayDefinition.firstElemOffset)
+    for i in range(biNormalsArrayDefinition.nbUsedEntries):
+        meshBuffer.vertices[i].biNormal = Vector((
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32(),  # wrapper.readInt16() / 8192,
+            wrapper.readFloat32()  # wrapper.readInt16() / 8192
+        ))
+
+    wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffset)
+    meshBuffer.indices = [0 for i in range(facesArrayDefinition.nbUsedEntries * 3)]
+    for i in range(facesArrayDefinition.nbUsedEntries):
+        wrapper.seek(4 * 4 + 4, relative=True)
+        if modelData.fileVersion == 133:
+            wrapper.seek(3 * 4, relative=True)
+
+        meshBuffer.indices[i * 3 + 0] = wrapper.readUInt32()
+        meshBuffer.indices[i * 3 + 1] = wrapper.readUInt32()
+        meshBuffer.indices[i * 3 + 2] = wrapper.readUInt32()
+
+        if modelData.fileVersion == 133:
+            wrapper.seek(4, relative=True)
+
+    for t in range(len(material.textures)):
+        wrapper.seek(modelData.offsetRawData + tVertsArrayDefinitions[t].firstElemOffset)
+        for i in range(tVertsArrayDefinitions[t].nbUsedEntries):
+            meshBuffer.vertices[i].tCoords = Vector((
+                wrapper.readFloat32(),
+                wrapper.readFloat32()
+            ))
+
+    # TODO load custom materials based on textureStrings[0] (typically will be __shader__)
+    return meshBuffer
+
+
+def loadSkinNode(
+    wrapper: FileWrapper,
+    modelData: ModelData,
+    joint: ModelJoint,
+    parentMesh: ModelMesh
+):
+    print('post load skin node')
+    meshBuffer = readSkinNode(
+        wrapper=wrapper,
+        modelData=modelData,
+        parentMesh=parentMesh
+    )
+    parentMesh.meshBuffers.append(meshBuffer)
+    joint.attachedMeshes.append(meshBuffer)
 
 
 def loadNode(
@@ -679,7 +958,7 @@ def loadNode(
             name=name,
             animatedPosition=controllersData.position,
             animatedScale=controllersData.scale,
-            animatedRotation=controllersData.rotation.invert()
+            animatedRotation=controllersData.rotation#.invert()
         )
         parentMesh.joints.append(joint)
 
@@ -699,6 +978,7 @@ def loadNode(
 
     if meshBuffer is not None:
         parentMesh.meshBuffers.append(meshBuffer)
+        joint.attachedMeshes.append(meshBuffer)
 
     for childOffset in children:
         wrapper.seek(modelData.offsetModelData + childOffset)
@@ -802,6 +1082,16 @@ def load(
         parentMesh=None,
         parentTransform=global_matrix if global_matrix else _defaultMatrix()
     )
-    print(postLoad)
+
+    back = wrapper.offset
+    for offset, controllersData, joint in postLoad:
+        wrapper.seek(offset)
+        loadSkinNode(
+            wrapper=wrapper,
+            modelData=modelData,
+            parentMesh=importedMeshData,
+            joint=joint
+        )
+    wrapper.seek(back)
 
     return {'FINISHED'}

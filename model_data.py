@@ -133,8 +133,8 @@ class ModelWeight(object):
     def __init__(self,
                  vertexId: int,
                  strength: float,
-                 staticPos: Vector,
-                 staticNormal: Vector
+                 staticPos: Vector = None,
+                 staticNormal: Vector = None
                  ):
         super().__init__()
         self.vertexId = vertexId
@@ -187,7 +187,7 @@ class ModelJoint(object):
                  globalAnimatedMatrix: Matrix = _defaultMatrix(),
                  localAnimatedMatrix: Matrix = _defaultMatrix(),
                  children: list = [],
-                 attachedMeshes: List[int] = [],
+                 attachedMeshes: list = [],
                  weights: List[ModelWeight] = [],
                  positionKeys: List[ModelPositionKey] = [],
                  scaleKeys: List[ModelScaleKey] = [],
@@ -460,6 +460,9 @@ class ModelMaterial(object):
 
     def hasMaterial(self):
         return len(self.shader) > 0 or len(self.textures) > 0
+
+    def __repr__(self) -> str:
+        return "{}({!r})".format(self.__class__.__name__, self.__dict__)
 
     @classmethod
     def fromString(cls, data: str):
