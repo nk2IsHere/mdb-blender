@@ -1,6 +1,7 @@
 # nk2's craft made of plasticine (level: Kindergarten, 1 year)
 # heavily based on https://github.com/JLouis-B/RedTools/blob/master/W2ENT_QT/IO_MeshLoader_WitcherMDL.cpp
 import os
+from collections import OrderedDict
 from itertools import chain
 
 import bpy
@@ -158,39 +159,37 @@ def evaluateTextures(
     lightMapDayNight: bool,
     lightMapName: str
 ):
-    material.textures = [
-        material.textures[i] if len(material.textures) > i else ""
-            for i in range(textureCount)
-    ]
+    material.textures = OrderedDict((
+        ('texture0', material.textures['texture0'] if 'texture0' in material.textures else ''),
+        ('texture1', material.textures['texture1'] if 'texture1' in material.textures else ''),
+        ('texture2', material.textures['texture2'] if 'texture2' in material.textures else ''),
+        ('texture3', material.textures['texture3'] if 'texture3' in material.textures else '')
+    ))
 
     for t in range(textureCount):
-        if material.textures[t] == "" and staticTextureStrings is not None:
-            material.textures[t] = staticTextureStrings[t]
+        textureType = 'texture{}'.format(t)
+        if material.textures[textureType] == "" and staticTextureStrings is not None:
+            material.textures[textureType] = staticTextureStrings[t]
 
         if tVertsArrayDefinitions[t].nbUsedEntries == 0:
-            material.textures[t] = ""
+            material.textures[textureType] = ""
 
-        if material.textures[t] == "":
+        if material.textures[textureType] == "":
             continue
 
-        if lightMapDayNight and material.textures[t] == lightMapName:
-            if getTexture(modelData, material.textures[t] + "!d") is not None:  # dzien
-                material.textures[t] += "!d"
-            elif getTexture(modelData, material.textures[t] + "!r") is not None:  # rano
-                material.textures[t] += "!r"
-            elif getTexture(modelData, material.textures[t] + "!p") is not None:  # poludzien
-                material.textures[t] += "!p"
-            elif getTexture(modelData, material.textures[t] + "!w") is not None:  # wieczor
-                material.textures[t] += "!w"
-            elif getTexture(modelData, material.textures[t] + "!n") is not None:  # noc
-                material.textures[t] += "!n"
+        if lightMapDayNight and material.textures[textureType] == lightMapName:
+            if getTexture(modelData, material.textures[textureType] + "!d") is not None:  # dzien
+                material.textures[textureType] = material.textures[textureType] + "!d"
+            elif getTexture(modelData, material.textures[textureType] + "!r") is not None:  # rano
+                material.textures[textureType] = material.textures[textureType] + "!r"
+            elif getTexture(modelData, material.textures[textureType] + "!p") is not None:  # poludnie
+                material.textures[textureType] = material.textures[textureType] + "!p"
+            elif getTexture(modelData, material.textures[textureType] + "!w") is not None:  # wieczor
+                material.textures[textureType] = material.textures[textureType] + "!w"
+            elif getTexture(modelData, material.textures[textureType] + "!n") is not None:  # noc
+                material.textures[textureType] = material.textures[textureType] + "!n"
             else:
-                material.textures[t] = ""
-
-    material.textures = list(filter(
-        lambda texture: texture != "",
-        material.textures
-    ))
+                material.textures[textureType] = ""
 
 
 def readMeshNode(
@@ -261,10 +260,10 @@ def readMeshNode(
     wrapper.seek(3, relative=True)  # Unknown
     enlargeStartDistance = wrapper.readFloat32()
     affectedByWind = wrapper.readByte() == 1
+
+    wrapper.seek(3, relative=True)  # Unknown
     dampFactor = wrapper.readFloat32()
     blendGroup = wrapper.readUInt32()
-
-    wrapper.seek(3, relative=True)  # Unknown # FIXME if here fails, maybe this is the reason
     dayNightLightMaps = wrapper.readByte() == 1
     dayNightTransition = wrapper.readString(200)
     ignoreHitCheck = wrapper.readByte() == 1
@@ -711,10 +710,10 @@ def readSkinNode(
     wrapper.seek(3, relative=True)  # Unknown
     enlargeStartDistance = wrapper.readFloat32()
     affectedByWind = wrapper.readByte() == 1
-    dampFactor = wrapper.readFloat32()
-    blendGroup = wrapper.readUInt32()
 
     wrapper.seek(3, relative=True)  # Unknown
+    dampFactor = wrapper.readFloat32()
+    blendGroup = wrapper.readUInt32()
     dayNightLightMaps = wrapper.readByte()
     dayNightTransition = wrapper.readString(200)
     ignoreHitCheck = wrapper.readByte() == 1

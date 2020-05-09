@@ -4,10 +4,11 @@
 #  [notification to myself]
 import os
 import re
+from collections import OrderedDict
 from enum import Enum
 
 from mathutils import Vector, Quaternion, Matrix, Color, Euler
-from typing import List, Tuple
+from typing import List, Tuple, Dict, OrderedDict as TOrderedDict
 
 
 class ModelData(object):
@@ -262,10 +263,10 @@ class ModelMaterialType(Enum):
 class ModelMaterial(object):
     def __init__(self,
                  shader: str = '',
-                 textures: List[Tuple[str, str]] = [],
-                 bumpmaps: List[Tuple[str, str]] = [],
-                 floats: List[Tuple[str, float]] = [],
-                 vectors: List[Tuple[str, Vector]] = [],
+                 textures: TOrderedDict[str, str] = OrderedDict(),
+                 bumpmaps: TOrderedDict[str, str] = OrderedDict(),
+                 floats: TOrderedDict[str, float] = OrderedDict(),
+                 vectors: TOrderedDict[str, Vector] = OrderedDict(),
                  diffuseColor: Color = None,
                  ambientColor: Color = None,
                  specularColor: Color = None,
@@ -399,47 +400,47 @@ class ModelMaterial(object):
                               detailMapScape: float = None,
                               enableSpecular: bool = None
                               ):
-        self.diffuseColor = diffuseColor
-        self.ambientColor = ambientColor
-        self.specularColor = specularColor
-        self.shininess = shininess
-        self.shadow = shadow
-        self.beaming = beaming
-        self.render = render
-        self.transparencyHint = transparencyHint
-        self.textureStrings = textureStrings
-        self.tileFade = tileFade
-        self.controlFade = controlFade
-        self.lightMapped = lightMapped
-        self.rotateTexture = rotateTexture
-        self.transparencyShift = transparencyShift
-        self.defaultRenderList = defaultRenderList
-        self.preserveVColors = preserveVColors
-        self.fourCC = fourCC
-        self.depthOffset = depthOffset
-        self.coronaCenterMult = coronaCenterMult
-        self.fadeStartDistance = fadeStartDistance
-        self.distFromScreenCenterFace = distFromScreenCenterFace
-        self.enlargeStartDistance = enlargeStartDistance
-        self.affectedByWind = affectedByWind
-        self.dampFactor = dampFactor
-        self.blendGroup = blendGroup
-        self.dayNightLightMaps = dayNightLightMaps
-        self.dayNightTransition = dayNightTransition
-        self.ignoreHitCheck = ignoreHitCheck
-        self.needsReflection = needsReflection
-        self.reflectionPlaneNormal = reflectionPlaneNormal
-        self.reflectionPlaneDistance = reflectionPlaneDistance
-        self.fadeOnCameraCollision = fadeOnCameraCollision
-        self.noSelfShadow = noSelfShadow
-        self.isReflected = isReflected
-        self.onlyReflected = onlyReflected
-        self.lightMapName = lightMapName
-        self.canDecal = canDecal
-        self.multiBillBoard = multiBillBoard
-        self.ignoreLODReflection = ignoreLODReflection
-        self.detailMapScape = detailMapScape
-        self.enableSpecular = enableSpecular
+        self.diffuseColor = diffuseColor if diffuseColor is not None else self.diffuseColor
+        self.ambientColor = ambientColor if ambientColor is not None else self.ambientColor
+        self.specularColor = specularColor if specularColor is not None else self.specularColor
+        self.shininess = shininess if shininess is not None else self.shininess
+        self.shadow = shadow if shadow is not None else self.shadow
+        self.beaming = beaming if beaming is not None else self.beaming
+        self.render = render if render is not None else self.render
+        self.transparencyHint = transparencyHint if transparencyHint is not None else self.transparencyHint
+        self.textureStrings = textureStrings if textureStrings is not None else self.textureStrings
+        self.tileFade = tileFade if tileFade is not None else self.tileFade
+        self.controlFade = controlFade if controlFade is not None else self.controlFade
+        self.lightMapped = lightMapped if lightMapped is not None else self.lightMapped
+        self.rotateTexture = rotateTexture if rotateTexture is not None else self.rotateTexture
+        self.transparencyShift = transparencyShift if transparencyShift is not None else self.transparencyShift
+        self.defaultRenderList = defaultRenderList if defaultRenderList is not None else self.defaultRenderList
+        self.preserveVColors = preserveVColors if preserveVColors is not None else self.preserveVColors
+        self.fourCC = fourCC if fourCC is not None else self.fourCC
+        self.depthOffset = depthOffset if depthOffset is not None else self.depthOffset
+        self.coronaCenterMult = coronaCenterMult if coronaCenterMult is not None else self.coronaCenterMult
+        self.fadeStartDistance = fadeStartDistance if fadeStartDistance is not None else self.fadeStartDistance
+        self.distFromScreenCenterFace = distFromScreenCenterFace if distFromScreenCenterFace is not None else self.distFromScreenCenterFace
+        self.enlargeStartDistance = enlargeStartDistance if enlargeStartDistance is not None else self.enlargeStartDistance
+        self.affectedByWind = affectedByWind if affectedByWind is not None else self.affectedByWind
+        self.dampFactor = dampFactor if dampFactor is not None else self.dampFactor
+        self.blendGroup = blendGroup if blendGroup is not None else self.blendGroup
+        self.dayNightLightMaps = dayNightLightMaps if dayNightLightMaps is not None else self.dayNightLightMaps
+        self.dayNightTransition = dayNightTransition if dayNightTransition is not None else self.dayNightTransition
+        self.ignoreHitCheck = ignoreHitCheck if ignoreHitCheck is not None else self.ignoreHitCheck
+        self.needsReflection = needsReflection if needsReflection is not None else self.needsReflection
+        self.reflectionPlaneNormal = reflectionPlaneNormal if reflectionPlaneNormal is not None else self.reflectionPlaneNormal
+        self.reflectionPlaneDistance = reflectionPlaneDistance if reflectionPlaneDistance is not None else self.reflectionPlaneDistance
+        self.fadeOnCameraCollision = fadeOnCameraCollision if fadeOnCameraCollision is not None else self.fadeOnCameraCollision
+        self.noSelfShadow = noSelfShadow if noSelfShadow is not None else self.noSelfShadow
+        self.isReflected = isReflected if isReflected is not None else self.isReflected
+        self.onlyReflected = onlyReflected if onlyReflected is not None else self.onlyReflected
+        self.lightMapName = lightMapName if lightMapName is not None else self.lightMapName
+        self.canDecal = canDecal if canDecal is not None else self.canDecal
+        self.multiBillBoard = multiBillBoard if multiBillBoard is not None else self.multiBillBoard
+        self.ignoreLODReflection = ignoreLODReflection if ignoreLODReflection is not None else self.ignoreLODReflection
+        self.detailMapScape = detailMapScape if detailMapScape is not None else self.detailMapScape
+        self.enableSpecular = enableSpecular if enableSpecular is not None else self.enableSpecular
 
     def getMaterialTypeFromShader(self):
         return ModelMaterialType.ModelMaterialTypeTransparent \
@@ -468,7 +469,10 @@ class ModelMaterial(object):
     def fromString(cls, data: str):
         instance = cls()
 
-        data = re.split(' \t\r\n', data)
+        data = list(filter(
+            lambda token: len(token) > 0 and token != '\x00',
+            re.split(r'[ \t\r\n]', data)
+        ))
         i = 0
         while i < len(data):
             dataType = data[i]
@@ -478,23 +482,23 @@ class ModelMaterial(object):
             elif dataType == 'texture':
                 id, value = data[i + 1: i + 3]
                 i += 2
-                instance.textures.append((id, value))
+                instance.textures[id if id != 'tex' else 'texture{}'.format(len(instance.textures))] = value
             elif dataType == 'bumpmap':
                 id, value = data[i + 1: i + 3]
                 i += 2
-                instance.bumpmaps.append((id, value))
+                instance.bumpmaps[id] = value
             elif dataType == 'string':
                 id, value = data[i + 1: i + 3]
                 i += 2
-                instance.textures.append((id, value))
+                instance.textures[id] = value
             elif dataType == 'float':
                 id, value = data[i + 1: i + 3]
                 i += 2
-                instance.floats.append((id, float(value)))
+                instance.floats[id] = float(value)
             elif dataType == 'vector':
                 id, x, y, z, w = data[i + 1: i + 6]
                 i += 5
-                instance.vectors.append((id, Vector((x, y, z))))
+                instance.vectors[id] = Vector((x, y, z))
             i += 1
 
         return instance
