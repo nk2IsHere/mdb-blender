@@ -11,7 +11,8 @@ from mathutils import Matrix, Vector, Quaternion, Color
 
 from .model_types import ControllerType, NodeType
 from .model_data import ModelData, StaticControllersData, ControllersData, ModelMesh, ModelJoint, _defaultMatrix, \
-    ModelBoundingBox, ModelMaterial, ModelMeshBuffer, ModelVertex, ModelTextureLayer, ModelWeight
+    ModelBoundingBox, ModelMaterial, ModelMeshBuffer, ModelVertex, ModelTextureLayer, ModelWeight, ModelBoundingSphere, \
+    ModelAnimationNode, ModelPositionKey, ModelRotationKey, ModelScaleKey, ModelAnimationMeta
 from .file_utils import FileWrapper, ArrayDefinition, readArray
 
 
@@ -987,6 +988,129 @@ def loadNode(
     return parentMesh, postLoad
 
 
+def readAnimationNode(
+    wrapper: FileWrapper,
+    modelData: ModelData,
+    parentMesh: ModelMesh,
+    children: List[ModelAnimationNode] = []
+):
+    wrapper.seek(24 + 4, relative=True)  # Function pointers, inherit color flag
+    id = wrapper.readUInt32()
+    name = wrapper.readString(64)
+
+    wrapper.seek(8, relative=True)  # parent geometry + parent node
+    childNodesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    childNodes = readArray(wrapper, modelData, childNodesArrayDefinition, wrapper.readUInt32)
+
+    controllerKeyArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    controllerDataArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    controllers = readNodeControllers(wrapper, modelData, controllerKeyArrayDefinition, controllerDataArrayDefinition)
+
+    wrapper.seek(4 + 8, relative=True)  # node flags/type, fixed rot + imposter group ?
+    minLOD = wrapper.readFloat32()
+    maxLOD = wrapper.readFloat32()
+    type = NodeType(wrapper.readUInt32())
+
+    animation = ModelAnimationNode(
+        id=id,
+        name=name,
+        minLOD=minLOD,
+        maxLOD=maxLOD,
+        joint=parentMesh.getJointByName(name)
+    )
+
+    if animation.joint is not None:
+        for i in range(len(controllers.position)):
+            animation.positionKeys.append(ModelPositionKey(
+                frame=controllers.positionTime[i],
+                position=controllers.position[i]
+            ))
+        for i in range(len(controllers.rotation)):
+            animation.rotationKeys.append(ModelRotationKey(
+                frame=controllers.rotationTime[i],
+                rotation=controllers.rotation[i]
+            ))
+        for i in range(len(controllers.scale)):
+            animation.scaleKeys.append(ModelScaleKey(
+                frame=controllers.scaleTime[i],
+                scale=controllers.scale[i]
+            ))
+        # TODO check if other types of controllers required
+
+    for childNodeOffset in childNodes:
+        wrapper.seek(modelData.offsetModelData + childNodeOffset)
+        animation.children.append(readAnimationNode(wrapper, modelData, parentMesh, []))
+
+    return animation
+
+
+def loadAnimations(
+    wrapper: FileWrapper,
+    modelData: ModelData,
+    parentMesh: ModelMesh
+):
+    wrapper.seek(
+        modelData.offsetModelData + modelData.offsetRawData
+            if modelData.fileVersion == 133
+            else modelData.offsetTexData
+    )
+    chunkStart = wrapper.offset
+
+    wrapper.seek(4, relative=True)
+    animationsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
+    wrapper.seek(chunkStart + animationsArrayDefinition.firstElemOffset)
+    for i in range(animationsArrayDefinition.nbUsedEntries):
+        animOffset = wrapper.readUInt32()
+        back = wrapper.offset
+
+        wrapper.seek(modelData.offsetModelData + animOffset)
+        wrapper.seek(8, relative=True)
+        animationName = wrapper.readString(64)
+        offsetRootNode = wrapper.readUInt32()
+
+        wrapper.seek(32, relative=True)
+        geometryType = wrapper.readUByte()
+
+        wrapper.seek(3, relative=True)
+        animationLength = wrapper.readFloat32()
+        transitionTime = wrapper.readFloat32()
+        animationRootName = wrapper.readString(64)
+        eventArrayDef = ArrayDefinition.fromWrapper(wrapper)
+        animBox = ModelBoundingBox(
+            min=Vector((
+                wrapper.readFloat32(),
+                wrapper.readFloat32(),
+                wrapper.readFloat32()
+            )),
+            max=Vector((
+                wrapper.readFloat32(),
+                wrapper.readFloat32(),
+                wrapper.readFloat32()
+            ))
+        )
+        animSphere = ModelBoundingSphere(
+            x=wrapper.readFloat32(),
+            y=wrapper.readFloat32(),
+            z=wrapper.readFloat32(),
+            radius=wrapper.readFloat32(),
+        )
+
+        wrapper.seek(4, relative=True)  # Unknown
+        wrapper.seek(modelData.offsetModelData + offsetRootNode)
+        animation = readAnimationNode(wrapper, modelData, parentMesh)
+        parentMesh.animations.append(ModelAnimationMeta(
+            name=animationName,
+            rootName=animationRootName,
+            animationNode=animation,
+            length=animationLength,
+            transitionTime=transitionTime,
+            animationBox=animBox,
+            animationSphere=animSphere
+        ))
+
+        wrapper.seek(back)
+
+
 def loadMeta(
     wrapper: FileWrapper,
     baseDirectory: str,
@@ -1070,11 +1194,6 @@ def load(
 
     wrapper.seek(modelData.offsetModelData + modelData.offsetRootNode)
 
-    # mesh = bpy.data.meshes.new(name=modelData.modelName)
-    # obj = bpy.data.objects.new(modelName, mesh)
-    #
-    # bpy.context.collection.objects.link(obj)
-
     importedMeshData, postLoad = loadNode(
         wrapper=wrapper,
         modelData=modelData,
@@ -1082,7 +1201,6 @@ def load(
         parentTransform=global_matrix if global_matrix else _defaultMatrix()
     )
 
-    back = wrapper.offset
     for offset, controllersData, joint in postLoad:
         wrapper.seek(offset)
         loadSkinNode(
@@ -1091,6 +1209,11 @@ def load(
             parentMesh=importedMeshData,
             joint=joint
         )
-    wrapper.seek(back)
+
+    loadAnimations(
+        wrapper=wrapper,
+        modelData=modelData,
+        parentMesh=importedMeshData
+    )
 
     return {'FINISHED'}

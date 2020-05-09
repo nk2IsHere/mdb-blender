@@ -559,6 +559,73 @@ class ModelMeshBuffer(object):
         return "{}({!r})".format(self.__class__.__name__, self.__dict__)
 
 
+class ModelBoundingSphere(object):
+    def __init__(self,
+                 x: float,
+                 y: float,
+                 z: float,
+                 radius: float
+                 ):
+        super(object, self).__init__()
+        self.x = x
+        self.y = y
+        self.z = z
+        self.radius = radius
+
+    def __repr__(self) -> str:
+        return "{}({!r})".format(self.__class__.__name__, self.__dict__)
+
+
+class ModelAnimationNode(object):
+    def __init__(self,
+                 id: int,
+                 name: str,
+                 minLOD: float,
+                 maxLOD: float,
+                 joint: ModelJoint,
+                 positionKeys: List[ModelPositionKey] = [],
+                 scaleKeys: List[ModelScaleKey] = [],
+                 rotationKeys: List[ModelRotationKey] = [],
+                 children: list = []
+                 ):
+        super(object, self).__init__()
+        self.id = id
+        self.name = name
+        self.minLOD = minLOD
+        self.maxLOD = maxLOD
+        self.joint = joint
+        self.positionKeys = positionKeys
+        self.scaleKeys = scaleKeys
+        self.rotationKeys = rotationKeys
+        self.children = children
+
+    def __repr__(self) -> str:
+        return "{}({!r})".format(self.__class__.__name__, self.__dict__)
+
+
+class ModelAnimationMeta(object):
+    def __init__(self,
+                 name: str,
+                 rootName: str,
+                 animationNode: ModelAnimationNode,
+                 length: float,
+                 transitionTime: float,
+                 animationBox: ModelBoundingBox,
+                 animationSphere: ModelBoundingSphere,
+                 ):
+        super(object, self).__init__()
+        self.name = name
+        self.rootName = rootName
+        self.animationNode = animationNode
+        self.length = length
+        self.transitionTime = transitionTime
+        self.animationBox = animationBox
+        self.animationSphere = animationSphere
+
+    def __repr__(self) -> str:
+        return "{}({!r})".format(self.__class__.__name__, self.__dict__)
+
+
 class ModelMesh(object):
     def __init__(self,
                  meshBuffers: List[ModelMeshBuffer] = [],
@@ -567,19 +634,16 @@ class ModelMesh(object):
                  meshType: int = 0,
                  joints: List[ModelJoint] = [],
                  weights: List[ModelWeight] = [],
-                 positionKeys: List[ModelPositionKey] = [],
-                 scaleKeys: List[ModelScaleKey] = [],
-                 rotationKeys: List[ModelRotationKey] = [],
+                 animations: List[ModelAnimationMeta] = []
                  ):
+        super(object, self).__init__()
         self.meshBuffers = meshBuffers
         self.frameCount = frameCount
         self.animationSpeed = animationSpeed
         self.meshType = meshType
         self.joints = joints
         self.weights = weights
-        self.positionKeys = positionKeys
-        self.scaleKeys = scaleKeys
-        self.rotationKeys = rotationKeys
+        self.animations = animations
 
     def getJointByName(self, name):
         try:
