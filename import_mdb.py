@@ -9,6 +9,8 @@ from bpy_extras.object_utils import object_data_add
 from typing import List, Optional, Tuple
 from mathutils import Matrix, Vector, Quaternion, Color
 
+from .debug_utils import debugPrint as print, setDepth as debugSetDepth, increaseDepth as debugIncreaseDepth, \
+    decreaseDepth as debugDecreaseDepth
 from .model_types import ControllerType, NodeType
 from .model_data import ModelData, StaticControllersData, ControllersData, ModelMesh, ModelJoint, _defaultMatrix, \
     ModelBoundingBox, ModelMaterial, ModelMeshBuffer, ModelVertex, ModelTextureLayer, ModelWeight, ModelBoundingSphere, \
@@ -23,6 +25,7 @@ def readNodeControllers(
     controllerKeyDef: ArrayDefinition,
     controllerDataDef: ArrayDefinition
 ):
+    debugIncreaseDepth()
     controllers = ControllersData.default()
     controllerData = readArray(wrapper, modelData, controllerDataDef, wrapper.readFloat32)
     back = wrapper.offset
@@ -36,6 +39,7 @@ def readNodeControllers(
         nbColumns = wrapper.readUByte()
 
         wrapper.seek(1, relative=True)
+        print('read node controller', type=controllerType)
         if controllerType == ControllerType.ControllerPosition:
             for j in range(nbRows):
                 offset = j * nbColumns
@@ -81,6 +85,7 @@ def readNodeControllers(
                     controllerData[offset + firstValueIndex]
                 )
 
+    debugDecreaseDepth()
     wrapper.seek(back)
     return controllers
 
@@ -197,6 +202,7 @@ def readMeshNode(
     wrapper: FileWrapper,
     modelData: ModelData
 ):
+    debugIncreaseDepth()
     wrapper.seek(8, relative=True)  # Function pointer
     offMeshArrays = wrapper.readUInt32()
 
@@ -425,6 +431,7 @@ def readMeshNode(
                 wrapper.readFloat32()
             ))
 
+    debugDecreaseDepth()
     # TODO load custom materials based on textureStrings[0] (typically will be __shader__)
     return meshBuffer
 
@@ -433,6 +440,7 @@ def readTexturePaintNode(
     wrapper: FileWrapper,
     modelData: ModelData
 ):
+    debugIncreaseDepth()
     layersArrayDefinitions = ArrayDefinition.fromWrapper(wrapper)
 
     wrapper.seek(28, relative=True)  # Unknown
@@ -535,7 +543,7 @@ def readTexturePaintNode(
         textureLayers.append(textureLayer)
 
     material = ModelMaterial(
-        textures=[lightMapName],
+        textures=OrderedDict(('texture0', lightMapName)),
         diffuseColor=nodeDiffuseColor,
         ambientColor=nodeAmbientColor,
         specularColor=nodeSpecularColor,
@@ -638,6 +646,7 @@ def readTexturePaintNode(
                 wrapper.readFloat32()
             ))
 
+    debugDecreaseDepth()
     # TODO load custom materials based on textureStrings[0] (typically will be __shader__)
     return meshBuffer
 
@@ -647,6 +656,7 @@ def readSkinNode(
     modelData: ModelData,
     parentMesh: ModelMesh
 ):
+    debugIncreaseDepth()
     # TODO UNITE MESH HEADER (0x0 to 0x270)
     wrapper.seek(8, relative=True)  # Function pointer
     offMeshArrays = wrapper.readUInt32()
@@ -900,6 +910,7 @@ def readSkinNode(
                 wrapper.readFloat32()
             ))
 
+    debugDecreaseDepth()
     # TODO load custom materials based on textureStrings[0] (typically will be __shader__)
     return meshBuffer
 
@@ -910,6 +921,7 @@ def loadSkinNode(
     joint: ModelJoint,
     parentMesh: ModelMesh
 ):
+    debugIncreaseDepth()
     print('post load skin node')
     meshBuffer = readSkinNode(
         wrapper=wrapper,
@@ -918,6 +930,7 @@ def loadSkinNode(
     )
     parentMesh.meshBuffers.append(meshBuffer)
     joint.attachedMeshes.append(meshBuffer)
+    debugDecreaseDepth()
 
 
 def loadNode(
@@ -928,6 +941,7 @@ def loadNode(
     # why the fuck in petooh THIS IS A POINTER FOR EVERY RECURSIVE CALL?!
     postLoad: List[Tuple[int, StaticControllersData, ModelJoint]] = []
 ):
+    debugIncreaseDepth()
     if parentMesh is None:  # root node
         parentMesh = ModelMesh()
 
@@ -985,6 +999,7 @@ def loadNode(
         _, postLoadChild = loadNode(wrapper, modelData, parentMesh, parentTransform, [])
         postLoad += postLoadChild
 
+    debugDecreaseDepth()
     return parentMesh, postLoad
 
 
@@ -994,6 +1009,7 @@ def readAnimationNode(
     parentMesh: ModelMesh,
     children: List[ModelAnimationNode] = []
 ):
+    debugIncreaseDepth()
     wrapper.seek(24 + 4, relative=True)  # Function pointers, inherit color flag
     id = wrapper.readUInt32()
     name = wrapper.readString(64)
@@ -1019,6 +1035,7 @@ def readAnimationNode(
         joint=parentMesh.getJointByName(name)
     )
 
+    print('read animation node', id=id, name=name)
     if animation.joint is not None:
         for i in range(len(controllers.position)):
             animation.positionKeys.append(ModelPositionKey(
@@ -1041,6 +1058,7 @@ def readAnimationNode(
         wrapper.seek(modelData.offsetModelData + childNodeOffset)
         animation.children.append(readAnimationNode(wrapper, modelData, parentMesh, []))
 
+    debugDecreaseDepth()
     return animation
 
 
@@ -1049,6 +1067,7 @@ def loadAnimations(
     modelData: ModelData,
     parentMesh: ModelMesh
 ):
+    debugIncreaseDepth()
     wrapper.seek(
         modelData.offsetModelData + modelData.offsetRawData
             if modelData.fileVersion == 133
@@ -1095,9 +1114,12 @@ def loadAnimations(
             radius=wrapper.readFloat32(),
         )
 
+        print('read animation', rootName=animationRootName, name=animationName, length=animationLength)
+
         wrapper.seek(4, relative=True)  # Unknown
         wrapper.seek(modelData.offsetModelData + offsetRootNode)
         animation = readAnimationNode(wrapper, modelData, parentMesh)
+
         parentMesh.animations.append(ModelAnimationMeta(
             name=animationName,
             rootName=animationRootName,
@@ -1109,6 +1131,7 @@ def loadAnimations(
         ))
 
         wrapper.seek(back)
+    debugDecreaseDepth()
 
 
 def loadMeta(
@@ -1184,13 +1207,14 @@ def load(
     base_path=None,
     global_matrix: Matrix = None,
 ):
+    debugSetDepth(0)
     modelName, modelExtension = os.path.basename(filepath).split('.')
     baseDirectory = os.path.join(os.path.dirname(filepath), base_path)
 
     wrapper = FileWrapper.fromFile(open(filepath, "rb"))
 
     modelData = loadMeta(wrapper, baseDirectory, modelName)
-    print(modelData)
+    print(name=modelData.modelName, version=modelData.fileVersion)
 
     wrapper.seek(modelData.offsetModelData + modelData.offsetRootNode)
 

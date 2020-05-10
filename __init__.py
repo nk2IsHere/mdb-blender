@@ -1,6 +1,6 @@
 import bpy
+from bpy.props import StringProperty
 from bpy_extras.io_utils import orientation_helper, ImportHelper, axis_conversion
-from bpy.props import BoolProperty, FloatProperty, StringProperty
 
 bl_info = {
     "name": "The Witcher .mdb (.mba) importer",
@@ -32,21 +32,22 @@ class ImportMDB(bpy.types.Operator, ImportHelper):
     )
 
     def execute(self, context):
-        import importlib, sys  # required
+        import importlib
+        import sys
 
-        # reloads class' parent module and returns updated class
-        def reload_class(c):
+        def reloadClass(c):
             mod = sys.modules.get(c.__module__)
             importlib.reload(mod)
             return mod.__dict__[c.__name__]
 
         # imports to be updated
-        from . import file_utils, model_data, model_types
+        from . import file_utils, model_data, model_types, debug_utils
         from . import import_mdb
 
         importlib.reload(file_utils)
         importlib.reload(model_data)
         importlib.reload(model_types)
+        importlib.reload(debug_utils)
         importlib.reload(import_mdb)
 
         keywords = self.as_keywords(
@@ -60,6 +61,7 @@ class ImportMDB(bpy.types.Operator, ImportHelper):
         global_matrix = axis_conversion(from_forward=self.axis_forward, from_up=self.axis_up).to_4x4()
         keywords["global_matrix"] = global_matrix
 
+        debug_utils.setDebug(bl_info['support'] == 'TESTING')
         return import_mdb.load(self, context, **keywords)
 
 
