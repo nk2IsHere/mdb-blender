@@ -32,7 +32,7 @@ def debugPrint(*args, **kwargs):
         print(
             f"[{currentTime[:-3]}] ",
             '--' * G_DEPTH + ('> ' if G_DEPTH > 0 else ''),
-            ', '.join(args) if len(args) > 0 else '',
+            ', '.join(map(lambda arg: str(arg), args)) if len(args) > 0 else '',
             ' | ' if len(args) > 0 and len(kwargs) > 0 else '',
             ' '.join([f'{key}: {value},' for key, value in kwargs.items()])[:-1] if len(kwargs) > 0 else '',
             sep=''

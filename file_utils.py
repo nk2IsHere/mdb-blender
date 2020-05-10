@@ -93,6 +93,9 @@ class ArrayDefinition(object):
         self.nbUsedEntries = nbUsedEntries
         self.nbAllocatedEntries = nbAllocatedEntries
 
+    def __repr__(self) -> str:
+        return "{}({!r})".format(self.__class__.__name__, self.__dict__)
+
     @classmethod
     def fromWrapper(cls, wrapper: FileWrapper):
         return cls(

@@ -85,8 +85,8 @@ def readNodeControllers(
                     controllerData[offset + firstValueIndex]
                 )
 
-    debugDecreaseDepth()
     wrapper.seek(back)
+    debugDecreaseDepth()
     return controllers
 
 
@@ -293,7 +293,7 @@ def readMeshNode(
     detailMapScape = wrapper.readFloat32()
     modelData.offsetTextureInfo = wrapper.readUInt32()
 
-    wrapper.seek(modelData.offsetRawData, offMeshArrays)
+    wrapper.seek(modelData.offsetRawData + offMeshArrays)
     wrapper.seek(4, relative=True)
 
     vertexArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
@@ -1200,6 +1200,19 @@ def loadMeta(
     return modelData
 
 
+# ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# -----------------------------BLENDER---------------------------------
+# ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
+
+def wrapToBlender(
+    context,
+    mesh: ModelMesh
+):
+    pass
+
+
 def load(
     operator,
     context,
@@ -1225,6 +1238,7 @@ def load(
         parentTransform=global_matrix if global_matrix else _defaultMatrix()
     )
 
+    debugSetDepth(0)
     for offset, controllersData, joint in postLoad:
         wrapper.seek(offset)
         loadSkinNode(
@@ -1234,10 +1248,17 @@ def load(
             joint=joint
         )
 
+    debugSetDepth(0)
     loadAnimations(
         wrapper=wrapper,
         modelData=modelData,
         parentMesh=importedMeshData
+    )
+
+    debugSetDepth(0)
+    wrapToBlender(
+        context=context,
+        mesh=importedMeshData
     )
 
     return {'FINISHED'}

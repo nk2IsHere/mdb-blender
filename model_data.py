@@ -265,6 +265,7 @@ class ModelMaterial(object):
                  shader: str = '',
                  textures: TOrderedDict[str, str] = OrderedDict(),
                  bumpmaps: TOrderedDict[str, str] = OrderedDict(),
+                 strings: TOrderedDict[str, str] = OrderedDict(),
                  floats: TOrderedDict[str, float] = OrderedDict(),
                  vectors: TOrderedDict[str, Vector] = OrderedDict(),
                  diffuseColor: Color = None,
@@ -313,6 +314,7 @@ class ModelMaterial(object):
         self.shader = shader
         self.textures = textures
         self.bumpmaps = bumpmaps
+        self.strings = strings
         self.floats = floats
         self.vectors = vectors
         self.diffuseColor = diffuseColor
@@ -448,14 +450,13 @@ class ModelMaterial(object):
             else ModelMaterialType.ModelMaterialTypeSolid
 
     def getTexture(self, slot: int):
-        # TW1 supports only 1 slot for textures
-        if slot != 0 or len(self.textures) == 0:
+        if len(self.textures) == 0:
             return None
 
         return next(
             map(
                 lambda kv: kv[1],
-                filter(lambda kv: kv[0] in ["tex", "texture0", "diffuse_texture", "diffuse_map"], self.textures)
+                filter(lambda kv: kv[0] == 'texture{}'.format(slot), self.textures)
             )
         )
 
@@ -481,24 +482,24 @@ class ModelMaterial(object):
                 i += 1
             elif dataType == 'texture':
                 id, value = data[i + 1: i + 3]
-                i += 2
                 instance.textures[id if id != 'tex' else 'texture{}'.format(len(instance.textures))] = value
+                i += 2
             elif dataType == 'bumpmap':
                 id, value = data[i + 1: i + 3]
-                i += 2
                 instance.bumpmaps[id] = value
+                i += 2
             elif dataType == 'string':
                 id, value = data[i + 1: i + 3]
+                instance.strings[id] = value
                 i += 2
-                instance.textures[id] = value
             elif dataType == 'float':
                 id, value = data[i + 1: i + 3]
-                i += 2
                 instance.floats[id] = float(value)
+                i += 2
             elif dataType == 'vector':
                 id, x, y, z, w = data[i + 1: i + 6]
+                instance.vectors[id] = Vector((float(x), float(y), float(z)))
                 i += 5
-                instance.vectors[id] = Vector((x, y, z))
             i += 1
 
         return instance
