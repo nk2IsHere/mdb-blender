@@ -187,14 +187,26 @@ class ModelJoint(object):
                  globalMatrix: Matrix,
                  globalAnimatedMatrix: Matrix = _defaultMatrix(),
                  localAnimatedMatrix: Matrix = _defaultMatrix(),
-                 children: list = [],
-                 attachedMeshes: list = [],
-                 weights: List[ModelWeight] = [],
-                 positionKeys: List[ModelPositionKey] = [],
-                 scaleKeys: List[ModelScaleKey] = [],
-                 rotationKeys: List[ModelRotationKey] = [],
+                 children=None,
+                 attachedMeshes=None,
+                 weights=None,
+                 positionKeys=None,
+                 scaleKeys=None,
+                 rotationKeys=None,
                  ):
         super(object, self).__init__()
+        if rotationKeys is None:
+            rotationKeys = []
+        if scaleKeys is None:
+            scaleKeys = []
+        if positionKeys is None:
+            positionKeys = []
+        if weights is None:
+            weights = []
+        if attachedMeshes is None:
+            attachedMeshes = []
+        if children is None:
+            children = []
         self.name = name
         self.animatedPosition = animatedPosition
         self.animatedScale = animatedScale
@@ -263,11 +275,11 @@ class ModelMaterialType(Enum):
 class ModelMaterial(object):
     def __init__(self,
                  shader: str = '',
-                 textures: TOrderedDict[str, str] = OrderedDict(),
-                 bumpmaps: TOrderedDict[str, str] = OrderedDict(),
-                 strings: TOrderedDict[str, str] = OrderedDict(),
-                 floats: TOrderedDict[str, float] = OrderedDict(),
-                 vectors: TOrderedDict[str, Vector] = OrderedDict(),
+                 textures=None,
+                 bumpmaps=None,
+                 strings=None,
+                 floats=None,
+                 vectors=None,
                  diffuseColor: Color = None,
                  ambientColor: Color = None,
                  specularColor: Color = None,
@@ -311,6 +323,16 @@ class ModelMaterial(object):
                  enableSpecular: bool = None,
                  ):
         super().__init__()
+        if vectors is None:
+            vectors = OrderedDict()
+        if floats is None:
+            floats = OrderedDict()
+        if strings is None:
+            strings = OrderedDict()
+        if bumpmaps is None:
+            bumpmaps = OrderedDict()
+        if textures is None:
+            textures = OrderedDict()
         self.shader = shader
         self.textures = textures
         self.bumpmaps = bumpmaps
@@ -518,9 +540,11 @@ class ModelTextureLayer(object):
     def __init__(self,
                  hasTexture: bool,
                  texture: str = None,
-                 weights: List[float] = []
+                 weights=None
                  ):
         super().__init__()
+        if weights is None:
+            weights = []
         self.hasTexture = hasTexture
         self.texture = texture
         self.weights = weights
@@ -531,29 +555,25 @@ class ModelTextureLayer(object):
 
 class ModelMeshBuffer(object):
     def __init__(self,
+                 name: str,
                  material: ModelMaterial = None,
-                 vertexType: int = 0,
-                 vertices: List[ModelVertex] = [],
-                 indices: List[int] = [],
+                 vertices=None,
+                 indices=None,
                  boundingBox: ModelBoundingBox = None,
-                 position: Vector = None,
-                 normal: Vector = None,
-                 tCoords: Vector = None,
-                 primitives: list = [],
-                 transformation: Matrix = _defaultMatrix(),
-                 textureLayers: List[ModelTextureLayer] = [],
+                 textureLayers=None,
                  ):
         super().__init__()
+        if textureLayers is None:
+            textureLayers = []
+        if vertices is None:
+            vertices = []
+        if indices is None:
+            indices = []
+        self.name = name
         self.material = material
-        self.vertexType = vertexType
         self.vertices = vertices
         self.indices = indices
         self.boundingBox = boundingBox
-        self.position = position
-        self.normal = normal
-        self.tCoords = tCoords
-        self.primitives = primitives
-        self.transformation = transformation
         self.textureLayers = textureLayers
 
     def __repr__(self) -> str:
@@ -584,12 +604,20 @@ class ModelAnimationNode(object):
                  minLOD: float,
                  maxLOD: float,
                  joint: ModelJoint,
-                 positionKeys: List[ModelPositionKey] = [],
-                 scaleKeys: List[ModelScaleKey] = [],
-                 rotationKeys: List[ModelRotationKey] = [],
-                 children: list = []
+                 positionKeys=None,
+                 scaleKeys=None,
+                 rotationKeys=None,
+                 children=None
                  ):
         super(object, self).__init__()
+        if children is None:
+            children = []
+        if rotationKeys is None:
+            rotationKeys = []
+        if scaleKeys is None:
+            scaleKeys = []
+        if positionKeys is None:
+            positionKeys = []
         self.id = id
         self.name = name
         self.minLOD = minLOD
@@ -629,15 +657,23 @@ class ModelAnimationMeta(object):
 
 class ModelMesh(object):
     def __init__(self,
-                 meshBuffers: List[ModelMeshBuffer] = [],
+                 meshBuffers=None,
                  frameCount: int = 0,
                  animationSpeed: float = 0,
                  meshType: int = 0,
-                 joints: List[ModelJoint] = [],
-                 weights: List[ModelWeight] = [],
-                 animations: List[ModelAnimationMeta] = []
+                 joints=None,
+                 weights=None,
+                 animations=None
                  ):
         super(object, self).__init__()
+        if animations is None:
+            animations = []
+        if weights is None:
+            weights = []
+        if joints is None:
+            joints = []
+        if meshBuffers is None:
+            meshBuffers = []
         self.meshBuffers = meshBuffers
         self.frameCount = frameCount
         self.animationSpeed = animationSpeed

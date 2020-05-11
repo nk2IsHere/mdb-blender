@@ -5,8 +5,11 @@ from collections import OrderedDict
 from itertools import chain
 
 import bpy
+from bpy_extras.io_utils import unpack_list
 from bpy_extras.object_utils import object_data_add
 from typing import List, Optional, Tuple
+
+from bpy_types import Object, Mesh
 from mathutils import Matrix, Vector, Quaternion, Color
 
 from .debug_utils import debugPrint as print, setDepth as debugSetDepth, increaseDepth as debugIncreaseDepth, \
@@ -200,7 +203,8 @@ def evaluateTextures(
 
 def readMeshNode(
     wrapper: FileWrapper,
-    modelData: ModelData
+    modelData: ModelData,
+    name: str
 ):
     debugIncreaseDepth()
     wrapper.seek(8, relative=True)  # Function pointer
@@ -309,13 +313,8 @@ def readMeshNode(
     modelData.offsetTexData = wrapper.readUInt32() if modelData.fileVersion == 133 else modelData.offsetTexData
 
     if vertexArrayDefinition.nbUsedEntries == 0 or facesArrayDefinition.nbUsedEntries == 0:
+        debugDecreaseDepth()
         return
-
-    wrapper.seek(24 + 12, relative=True)
-    weightsArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
-    weights = readArray(wrapper, modelData, weightsArrayDefinition, wrapper.readFloat32)
-    bonesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
-    bones = readArray(wrapper, modelData, bonesArrayDefinition, wrapper.readUByte)
 
     material = readTextures(wrapper, modelData)
     evaluateTextures(modelData, material, 4, textureStrings, tVertsArrayDefinitions, dayNightLightMaps, lightMapName)
@@ -363,6 +362,7 @@ def readMeshNode(
         enableSpecular=enableSpecular
     )
     meshBuffer = ModelMeshBuffer(
+        name=name,
         material=material,
         boundingBox=nodeBoundingBox
     )
@@ -410,15 +410,16 @@ def readMeshNode(
         ))
 
     wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffset)
-    meshBuffer.indices = [0 for i in range(facesArrayDefinition.nbUsedEntries * 3)]
     for i in range(facesArrayDefinition.nbUsedEntries):
         wrapper.seek(4 * 4 + 4, relative=True)
         if modelData.fileVersion == 133:
             wrapper.seek(3 * 4, relative=True)
 
-        meshBuffer.indices[i * 3 + 0] = wrapper.readUInt32()
-        meshBuffer.indices[i * 3 + 1] = wrapper.readUInt32()
-        meshBuffer.indices[i * 3 + 2] = wrapper.readUInt32()
+        meshBuffer.indices.append((
+            wrapper.readInt32(),
+            wrapper.readInt32(),
+            wrapper.readInt32()
+        ))
 
         if modelData.fileVersion == 133:
             wrapper.seek(4, relative=True)
@@ -438,7 +439,8 @@ def readMeshNode(
 
 def readTexturePaintNode(
     wrapper: FileWrapper,
-    modelData: ModelData
+    modelData: ModelData,
+    name: str
 ):
     debugIncreaseDepth()
     layersArrayDefinitions = ArrayDefinition.fromWrapper(wrapper)
@@ -526,6 +528,7 @@ def readTexturePaintNode(
     facesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
 
     if vertexArrayDefinition.nbUsedEntries == 0 or facesArrayDefinition.nbUsedEntries == 0:
+        debugDecreaseDepth()
         return
 
     textureLayers = []
@@ -577,6 +580,7 @@ def readTexturePaintNode(
     )
     evaluateTextures(modelData, material, 1, None, tVertsArrayDefinitions, dayNightLightMaps, lightMapName)
     meshBuffer = ModelMeshBuffer(
+        name=name,
         material=material,
         boundingBox=nodeBoundingBox,
         textureLayers=textureLayers
@@ -625,15 +629,16 @@ def readTexturePaintNode(
         ))
 
     wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffset)
-    meshBuffer.indices = [0 for i in range(facesArrayDefinition.nbUsedEntries * 3)]
     for i in range(facesArrayDefinition.nbUsedEntries):
         wrapper.seek(4 * 4 + 4, relative=True)
         if modelData.fileVersion == 133:
             wrapper.seek(3 * 4, relative=True)
 
-        meshBuffer.indices[i * 3 + 0] = wrapper.readUInt32()
-        meshBuffer.indices[i * 3 + 1] = wrapper.readUInt32()
-        meshBuffer.indices[i * 3 + 2] = wrapper.readUInt32()
+        meshBuffer.indices.append((
+            wrapper.readInt32(),
+            wrapper.readInt32(),
+            wrapper.readInt32()
+        ))
 
         if modelData.fileVersion == 133:
             wrapper.seek(4, relative=True)
@@ -654,7 +659,8 @@ def readTexturePaintNode(
 def readSkinNode(
     wrapper: FileWrapper,
     modelData: ModelData,
-    parentMesh: ModelMesh
+    parentMesh: ModelMesh,
+    name: str
 ):
     debugIncreaseDepth()
     # TODO UNITE MESH HEADER (0x0 to 0x270)
@@ -755,7 +761,7 @@ def readSkinNode(
     bones = []
     for i in range(bonesArrayDefinition.nbUsedEntries):
         boneId = wrapper.readUInt32()
-        boneName = wrapper.readString(92).split('+')[0]  # FIXME seems to collect garbage
+        boneName = wrapper.readString(92).split('+')[0]  # FIXME seems to collect garbage with name
         joint = parentMesh.getJointByName(boneName)
         bones.append(joint)
 
@@ -771,9 +777,12 @@ def readSkinNode(
     unknownArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
     facesArrayDefinition = ArrayDefinition.fromWrapper(wrapper)
 
+    print(vertexArrayDefinition, facesArrayDefinition)
+
     modelData.offsetTexData = wrapper.readUInt32() if modelData.fileVersion == 133 else modelData.offsetTexData
 
     if vertexArrayDefinition.nbUsedEntries == 0 or facesArrayDefinition.nbUsedEntries == 0:
+        debugDecreaseDepth()
         return
 
     wrapper.seek(24 + 12, relative=True)
@@ -828,6 +837,7 @@ def readSkinNode(
         enableSpecular=enableSpecular
     )
     meshBuffer = ModelMeshBuffer(
+        name=name,
         material=material,
         boundingBox=nodeBoundingBox
     )
@@ -889,15 +899,16 @@ def readSkinNode(
         ))
 
     wrapper.seek(modelData.offsetRawData + facesArrayDefinition.firstElemOffset)
-    meshBuffer.indices = [0 for i in range(facesArrayDefinition.nbUsedEntries * 3)]
     for i in range(facesArrayDefinition.nbUsedEntries):
         wrapper.seek(4 * 4 + 4, relative=True)
         if modelData.fileVersion == 133:
             wrapper.seek(3 * 4, relative=True)
 
-        meshBuffer.indices[i * 3 + 0] = wrapper.readUInt32()
-        meshBuffer.indices[i * 3 + 1] = wrapper.readUInt32()
-        meshBuffer.indices[i * 3 + 2] = wrapper.readUInt32()
+        meshBuffer.indices.append((
+            wrapper.readInt32(),
+            wrapper.readInt32(),
+            wrapper.readInt32()
+        ))
 
         if modelData.fileVersion == 133:
             wrapper.seek(4, relative=True)
@@ -922,14 +933,16 @@ def loadSkinNode(
     parentMesh: ModelMesh
 ):
     debugIncreaseDepth()
-    print('post load skin node')
+    print('post load skin node', name=joint.name)
     meshBuffer = readSkinNode(
         wrapper=wrapper,
         modelData=modelData,
-        parentMesh=parentMesh
+        parentMesh=parentMesh,
+        name=joint.name
     )
-    parentMesh.meshBuffers.append(meshBuffer)
-    joint.attachedMeshes.append(meshBuffer)
+    if meshBuffer is not None:
+        parentMesh.meshBuffers.append(meshBuffer)
+        joint.attachedMeshes.append(meshBuffer)
     debugDecreaseDepth()
 
 
@@ -976,11 +989,11 @@ def loadNode(
         )
         parentMesh.joints.append(joint)
 
-    print('load {} type {}'.format(name, type))
+    print('load node', name=name, type=type)
 
     meshBuffer = None
     if type == NodeType.NodeTypeTrimesh:
-        meshBuffer = readMeshNode(wrapper, modelData)
+        meshBuffer = readMeshNode(wrapper, modelData, joint.name)
     elif type == NodeType.NodeTypeSkin:
         # these should be loaded after other types
         postLoad.append((wrapper.offset, controllersData, joint))
@@ -988,9 +1001,10 @@ def loadNode(
         print('spt node should be loaded')
         # TODO SPT NODE LOADING
     elif type == NodeType.NodeTypeTexturePaint:
-        meshBuffer = readTexturePaintNode(wrapper, modelData)
+        meshBuffer = readTexturePaintNode(wrapper, modelData, joint.name)
 
     if meshBuffer is not None:
+        print('attach buffer')
         parentMesh.meshBuffers.append(meshBuffer)
         joint.attachedMeshes.append(meshBuffer)
 
@@ -1162,9 +1176,9 @@ def loadMeta(
         fileVersion=fileVersion,
         offsetModelData=offsetModelData,
         sizeModelData=sizeModelData,
-        offsetRawData=wrapper.readUInt32() + offsetModelData if fileVersion == 133 else 0,
+        offsetRawData=wrapper.readUInt32() + offsetModelData if fileVersion == 133 else offsetModelData,
         sizeRawData=wrapper.readUInt32() if fileVersion == 133 else 0,
-        offsetTexData=wrapper.readUInt32() + offsetModelData if fileVersion == 136 else 0,
+        offsetTexData=wrapper.readUInt32() + offsetModelData if fileVersion == 136 else offsetModelData,
         sizeTexData=wrapper.readUInt32() if fileVersion == 136 else 0,
         offsetTextureInfo=-1,  # will be filled later
         offsetRootNode=-1,
@@ -1206,11 +1220,55 @@ def loadMeta(
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
+
+def wrapVerticesToBlender(
+    vertices: List[ModelVertex],
+    indices: List[Tuple[int, int, int]]
+):
+    vertexes = []
+    faces = []
+    normals = []
+    tangents = []
+    biNormals = []
+
+    for i in range(len(vertices)):
+        vertex = vertices[i]
+
+        vertexes.append((vertex.position.x, vertex.position.y, vertex.position.z))
+        normals.append((vertex.normal.x, vertex.normal.y, vertex.normal.z))
+        tangents.append(
+            (vertex.tangent.x, vertex.tangent.y, vertex.tangent.z)
+                if vertex.tangent is not None
+                else (0, 0, 0)
+        )
+        biNormals.append(
+            (vertex.biNormal.x, vertex.biNormal.y, vertex.biNormal.z)
+                if vertex.biNormal is not None
+                else (0, 0, 0)
+        )
+
+    for indice in indices:
+        faces.append(indice)
+
+    return vertexes, faces, normals, tangents, biNormals
+
+
 def wrapToBlender(
     context,
-    mesh: ModelMesh
+    modelData: ModelData,
+    modelMesh: ModelMesh
 ):
-    pass
+    for buffer in modelMesh.meshBuffers:
+        print('wrap to blender', name=buffer.name)
+        mesh: Mesh = bpy.data.meshes.new(name="mesh_{}".format(buffer.name))
+        obj: Object = bpy.data.objects.new(buffer.name, mesh)
+        bpy.context.collection.objects.link(obj)
+
+        vertices, faces, normals, tangents, biNormals = wrapVerticesToBlender(buffer.vertices, buffer.indices)
+        mesh.from_pydata(vertices, [], faces)
+        mesh.vertices.foreach_set('normal', unpack_list(normals))
+        mesh.loops.foreach_set('tangent', unpack_list(tangents))
+        mesh.loops.foreach_set('bitangent', unpack_list(biNormals))
 
 
 def load(
@@ -1258,7 +1316,8 @@ def load(
     debugSetDepth(0)
     wrapToBlender(
         context=context,
-        mesh=importedMeshData
+        modelData=modelData,
+        modelMesh=importedMeshData
     )
 
     return {'FINISHED'}
